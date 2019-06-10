@@ -61,6 +61,7 @@ scaleDegree (Chord _ degree scale) =
   (scaleOctave scale) !! (fromEnum degree)
 
 
+-- TODO: add ability to cycle infinitely!
 -- Given a chord, return the pitches corresponding to it
 pitches :: Chord -> [Pitch]
 pitches c@(Chord intervals degree scale) =
@@ -160,7 +161,7 @@ toProgression :: Dur -> Scale -> [(Scale -> Chord)] -> Music Pitch
 toProgression d scale figures =
   line chords
   where
-    chords = map (toMusic d) cs
+    chords = map (Chords.toMusic d) cs
     cs     = map ($ scale) figures
 
 
