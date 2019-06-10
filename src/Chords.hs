@@ -58,9 +58,8 @@ data Chord = Chord { intervals :: [Interval]
 
 scaleDegree :: Chord -> Pitch
 scaleDegree (Chord _ degree scale) =
-  degreeNote
-  where
-    (Prim (Note _ degreeNote))  = (scaleOctave scale) !! (fromEnum degree)
+  (scaleOctave scale) !! (fromEnum degree)
+
 
 -- Given a chord, return the pitches corresponding to it
 pitches :: Chord -> [Pitch]
@@ -107,7 +106,7 @@ degreeName c@(Chord intervals degree _) =
 -- Useful representation of a chord, with
 -- both its "absolute" name and the degree
 -- relative to its producing scale:
--- λ> cMajScale = majorScale $ c 4 qn
+-- λ> cMajScale = majorScale $ (C,4)
 -- λ> cMin = Chord minorTriad Tonic cMajScale
 -- λ> cMin
 -- Cmin (i)
@@ -117,19 +116,14 @@ instance Show Chord where
 
 -- Given a set of pitches and a scale, try to guess the chord they imply/make
 -- e.g.
--- λ> cMajScale = majorScale $ c 4 qn
+-- λ> cMajScale = majorScale $ (C,4)
 -- λ> fromPitches [(C,4), (E,4), (G,4)] cMajScale
 -- Just C (I)
 fromPitches :: [Pitch] -> Scale -> Maybe Chord
 fromPitches pitches scale =
-  let
-    -- TODO: this is simpler when I make scale == [Pitch]
-    scalePitches = map getPitch scale
-    getPitch (Prim (Note _ p)) = p
-  in
-    case ((head pitches) `elemIndex` scalePitches) of
-      Just degree -> Just $ Chord (getIntervals pitches scale) (toEnum (degree `mod` 7)) scale
-      Nothing -> Nothing
+  case ((head pitches) `elemIndex` scale) of
+    Just degree -> Just $ Chord (getIntervals pitches scale) (toEnum (degree `mod` 7)) scale
+    Nothing -> Nothing
 
 getIntervals :: [Pitch] -> Scale -> [Interval]
 getIntervals pitches scale =
@@ -159,7 +153,7 @@ toMusic d c = chord notes
 -- Given a duration for all chords, a scale and a number of "chord constructors"
 -- generate a progression
 -- e.g.
--- λ> cMajScale = minorScale $ c 4 qn
+-- λ> cMajScale = minorScale $ (C,4)
 -- λ> toProgression qn cMajScale [_I, _ii, _V]
 -- λ> play $ toProgression qn cMajScale [_I, _ii, _V]
 toProgression :: Dur -> Scale -> [(Scale -> Chord)] -> Music Pitch
@@ -220,7 +214,7 @@ halfDimSeventhChord = Chord halfDimSeventh
 -- Common tonal chords, for progressions
 -- https://en.wikipedia.org/wiki/Chord_progression
 -- e.g.
--- λ> cMajScale = majorScale $ c 4 qn
+-- λ> cMajScale = majorScale $ (C,4)
 -- λ> _I cMajScale
 -- [(C,4),(E,4),(G,4)]
 _I   = Chord majorTriad Tonic
