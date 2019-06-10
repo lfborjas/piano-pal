@@ -2,6 +2,8 @@ module Chords where
 
 import Euterpea
 import Scales
+import Data.Char (toLower)
+import Data.List (intercalate, elemIndex)
 
 data Degree = Tonic       -- I
             | Supertonic  -- II
@@ -48,8 +50,95 @@ data Interval = PerfectUnison   -- DiminishedSecond
 -- https://en.wikipedia.org/wiki/Chord_(music)#Characteristics
 -- e.g. (Dominant, majorTriad) == V
 -- (Submediant, minorTriad) == vi
-data Chord = Chord Degree [Interval]
+data Chord = Chord { intervals :: [Interval]
+                   , degree    :: Degree
+                   , scale     :: Scale
+                   } deriving (Eq)
 
+
+scaleDegree :: Chord -> Pitch
+scaleDegree (Chord _ degree scale) =
+  degreeNote
+  where
+    (Prim (Note _ degreeNote))  = (scaleOctave scale) !! (fromEnum degree)
+
+-- Given a chord, return the pitches corresponding to it
+pitches :: Chord -> [Pitch]
+pitches c@(Chord intervals degree scale) =
+  map (stepInterval start) intervals
+  where
+    start = scaleDegree c
+
+-- Given a fully configured chord, return a common name
+chordName :: Chord -> String
+chordName c@(Chord intervals _ _) =
+  (show pc) ++ (mkName intervals)
+  where
+    (pc,_) = scaleDegree c
+    mkName i
+      | i == majorTriad = ""
+      | i == majorSixth = "maj6"
+      | i == domSeventh = "dom7"
+      | i == majSeventh = "maj7"
+      | i == augTriad   = "aug"
+      | i == augSeventh = "aug7"
+      | i == minorTriad = "min"
+      | i == minorSixth = "min6"
+      | i == minorSeventh = "min7"
+      | i == minMajSeventh = "min/maj7"
+      | i == dimTriad = "dim"
+      | i == dimSeventh = "dim7"
+      | i == halfDimSeventh = "/07"
+      | otherwise = concat ["[", (intercalate ", " (map show i)), "]"]
+
+degreeName :: Chord -> String
+degreeName c@(Chord intervals degree _) =
+  decorate intervals dName
+  where
+    dName = degreeNumbers !! fromEnum degree
+    degreeNumbers = ["I", "II", "III", "IV", "V", "VI", "VII"]
+    decorate i dn
+      | i == majorTriad = dn
+      | i == minorTriad = map toLower dn
+      | i == augTriad   = dn ++ "+"
+      | i == dimTriad   = (map toLower dn) ++ "0"
+      | otherwise = dn
+
+-- Useful representation of a chord, with
+-- both its "absolute" name and the degree
+-- relative to its producing scale:
+-- λ> cMajScale = majorScale $ c 4 qn
+-- λ> cMin = Chord minorTriad Tonic cMajScale
+-- λ> cMin
+-- Cmin (i)
+
+instance Show Chord where
+  show c = (chordName c) ++ " (" ++ (degreeName c) ++ ")"
+
+-- Given a set of pitches and a scale, try to guess the chord they imply/make
+-- e.g.
+-- λ> cMajScale = majorScale $ c 4 qn
+-- λ> fromPitches [(C,4), (E,4), (G,4)] cMajScale
+-- Just C (I)
+fromPitches :: [Pitch] -> Scale -> Maybe Chord
+fromPitches pitches scale =
+  let
+    -- TODO: this is simpler when I make scale == [Pitch]
+    scalePitches = map getPitch scale
+    getPitch (Prim (Note _ p)) = p
+  in
+    case ((head pitches) `elemIndex` scalePitches) of
+      Just degree -> Just $ Chord (getIntervals pitches scale) (toEnum (degree `mod` 7)) scale
+      Nothing -> Nothing
+
+getIntervals :: [Pitch] -> Scale -> [Interval]
+getIntervals pitches scale =
+  let
+    root = scaleDegree $ Chord [] Tonic scale
+    rootAP = absPitch root
+  in
+    map (toEnum . (subtract rootAP) . absPitch) pitches
+  
 -- Given a starting pitch and an interval, produce the pitch
 -- found at the end of that interval
 stepInterval :: Pitch -> Interval -> Pitch
@@ -58,23 +147,22 @@ stepInterval start interval = pitch (startAP + intervalAP)
     startAP    = absPitch start
     intervalAP = fromEnum interval
 
-mkChord :: [Interval] -> Pitch -> [Pitch]
-mkChord intervals root = map (stepInterval root) intervals
-
--- Given a chord representation, return a playable version
+-- Given a chord's vector of pitches, return a playable version
 -- e.g.
--- λ> toMusic qn $ majorTriad (C,4)
+-- λ> toMusic qn $ Chord majorTriad Tonic cMajScale
 -- Prim (Note (1 % 4) (C,4)) :=: (Prim (Note (1 % 4) (E,4)) :=: (Prim (Note (1 % 4) (G,4)) :=: Prim (Rest (0 % 1))))
-toMusic :: Dur -> [Pitch] -> Music Pitch
+toMusic :: Dur -> Chord -> Music Pitch
 toMusic d c = chord notes
   where
-    notes = map (note d) c
+    notes = map (note d) (pitches c)
 
 -- Given a duration for all chords, a scale and a number of "chord constructors"
 -- generate a progression
 -- e.g.
-
-toProgression :: Dur -> Scale -> [(Scale -> [Pitch])] -> Music Pitch
+-- λ> cMajScale = minorScale $ c 4 qn
+-- λ> toProgression qn cMajScale [_I, _ii, _V]
+-- λ> play $ toProgression qn cMajScale [_I, _ii, _V]
+toProgression :: Dur -> Scale -> [(Scale -> Chord)] -> Music Pitch
 toProgression d scale figures =
   line chords
   where
@@ -82,19 +170,15 @@ toProgression d scale figures =
     cs     = map ($ scale) figures
 
 
--- Given a scale and a chord description, returns the notes in that chord
--- for that scale
--- TODO: refactor scales to work with Pitches, not Music Pitches
--- TODO: should work with notes within the scale, not just
--- with the major scale of the given degree!!
-tonalChord :: Chord -> Scale -> [Pitch]
-tonalChord (Chord degree intervals) scale =
-  mkChord intervals start
-  where
-    (Prim (Note _ start)) = (scaleOctave scale) !! (fromEnum degree)
-
--- Common Chords:
+-- Common Chord Components:
 -- From: https://en.wikipedia.org/wiki/Chord_(music)#Examples
+
+{-
+
+Notice the liberal use of currying of the Chord constructor to express
+both general chords and scale degree chords.
+
+-}
 
 
 majorTriad = [PerfectUnison, MajorThird, PerfectFifth]
@@ -114,23 +198,23 @@ dimTriad = [PerfectUnison, MinorThird, DiminishedFifth]
 dimSeventh = dimTriad ++ [MajorSixth] -- MajorSixth == DiminishedSeventh
 halfDimSeventh = dimTriad ++ [MinorSeventh]
 
--- TODO: add more chords!
+-- TODO: add more components!
 
-majorChord = mkChord majorTriad
-minorChord = mkChord minorTriad
+majorChord = Chord majorTriad
+minorChord = Chord minorTriad
 
-majorSixthChord = mkChord majorSixth
-domSeventhChord = mkChord domSeventh
-majSeventhChord = mkChord majSeventh
+majorSixthChord = Chord majorSixth
+domSeventhChord = Chord domSeventh
+majSeventhChord = Chord majSeventh
 
-augSeventhChord = mkChord augSeventh
+augSeventhChord = Chord augSeventh
 
-minorSixthChord = mkChord minorSixth
-minorSeventhChord = mkChord minorSeventh
-minMajSeventhChord = mkChord minMajSeventh
+minorSixthChord = Chord minorSixth
+minorSeventhChord = Chord minorSeventh
+minMajSeventhChord = Chord minMajSeventh
 
-dimSeventhChord = mkChord dimSeventh
-halfDimSeventhChord = mkChord halfDimSeventh
+dimSeventhChord = Chord dimSeventh
+halfDimSeventhChord = Chord halfDimSeventh
 
 
 -- Common tonal chords, for progressions
@@ -139,9 +223,9 @@ halfDimSeventhChord = mkChord halfDimSeventh
 -- λ> cMajScale = majorScale $ c 4 qn
 -- λ> _I cMajScale
 -- [(C,4),(E,4),(G,4)]
-_I   = tonalChord $ Chord Tonic majorTriad
-_IV  = tonalChord $ Chord Subdominant majorTriad
-_V   = tonalChord $ Chord Dominant majorTriad
-_ii  = tonalChord $ Chord Supertonic minorTriad
-_iii = tonalChord $ Chord Mediant minorTriad
-_vi  = tonalChord $ Chord Submediant minorTriad
+_I   = Chord majorTriad Tonic
+_IV  = Chord majorTriad Subdominant
+_V   = Chord majorTriad Dominant
+_ii  = Chord minorTriad Supertonic
+_iii = Chord minorTriad Mediant
+_vi  = Chord minorTriad Submediant
