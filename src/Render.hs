@@ -56,11 +56,11 @@ instance LilypondRenderable Octave where
 -- TODO: there's many more bells and whistles, like scales and tempi:
 -- http://lilypond.org/doc/v2.18/Documentation/learning/simple-notation#all-together
 renderScore :: ScoreFragment -> String
-renderScore sf = "{" ++ sf ++ "}"
+renderScore sf = "{ \\clef treble " ++ sf ++ "}"
 
 renderScoreFile :: String -> String -> IO ()
 renderScoreFile s n = do
-  callCommand $ concat ["echo ", s, " > ", n, ".ly"]
+  writeFile (n ++ ".ly") s
   callCommand $ concat ["~/bin/lilypond ", n, ".ly"]
 
 {-
