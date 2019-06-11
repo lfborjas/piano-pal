@@ -22,6 +22,27 @@ data Score = Score { clef :: String
 class LilypondRenderable a where
   toLilypond :: a -> ScoreFragment
 
+
+
+instance LilypondRenderable Pitch where
+  toLilypond (pc, o) = concat [toLilypond pc, toLilypond o]
+
+-- See: http://lilypond.org/doc/v2.18/Documentation/notation/writing-rhythms
+instance LilypondRenderable Dur where
+  -- TODO: fails with values longer than 1/2 (see lilypond docs above)
+  toLilypond d = show $ denominator d
+
+-- See: http://lilypond.org/doc/v2.18/Documentation/notation/writing-pitches
+instance LilypondRenderable PitchClass where
+  toLilypond pc = map toLower $ show pc
+
+-- See: http://lilypond.org/doc/v2.18/Documentation/notation/writing-pitches
+instance LilypondRenderable Octave where
+  toLilypond o
+    | o == 3 = ""
+    | o < 3  = concat $ take (3-o) $ repeat ","
+    | o > 3  = concat $ take (o-3) $ repeat "'"
+
 -- Allows us to render a subset of possible music values:
 -- e.g.
 -- λ> toLilypond $ removeZeros $ Scales.toMusic en cMaj
@@ -45,25 +66,6 @@ showChord (m :=: ms) =
     toL (y :=: ys)   = lconcat [toLilypond (getPitch y), toL ys]
     getPitch (Prim (Note _ p)) = p
     getDur   (Prim (Note d _)) = d
-
-instance LilypondRenderable Pitch where
-  toLilypond (pc, o) = concat [toLilypond pc, toLilypond o]
-
--- See: http://lilypond.org/doc/v2.18/Documentation/notation/writing-rhythms
-instance LilypondRenderable Dur where
-  -- TODO: fails with values longer than 1/2 (see lilypond docs above)
-  toLilypond d = show $ denominator d
-
--- See: http://lilypond.org/doc/v2.18/Documentation/notation/writing-pitches
-instance LilypondRenderable PitchClass where
-  toLilypond pc = map toLower $ show pc
-
--- See: http://lilypond.org/doc/v2.18/Documentation/notation/writing-pitches
-instance LilypondRenderable Octave where
-  toLilypond o
-    | o == 3 = ""
-    | o < 3  = concat $ take (3-o) $ repeat ","
-    | o > 3  = concat $ take (o-3) $ repeat "'"
 
 lconcat = intercalate " "
 
