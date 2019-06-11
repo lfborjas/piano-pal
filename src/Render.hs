@@ -11,7 +11,12 @@ import Data.Char (toLower)
 import Data.List (intercalate)
 import System.Process (callCommand)
 
+
+
 type ScoreFragment = String
+data Score = Score { clef :: String
+                   , fragments :: [ScoreFragment]
+                   }
 
 -- For reference, start here: http://lilypond.org/text-input.html
 -- and: http://lilypond.org/doc/v2.18/Documentation/learning/simple-notation#all-together
@@ -21,13 +26,10 @@ class LilypondRenderable a where
 instance LilypondRenderable Chord where
   toLilypond c = "<>"
 
-lconcat = intercalate " "
-
 -- Allows us to render a subset of possible music values:
 -- e.g.
 -- λ> toLilypond $ removeZeros $ Scales.toMusic en cMaj
 -- "c'8 d'8 e'8 f'8 g'8 a'8 b'8 c''8"
-
 instance LilypondRenderable (Music Pitch) where
   toLilypond (Prim (Note d p)) = concat [toLilypond p, toLilypond d]
   toLilypond (Prim (Rest 0)) = "s"
@@ -53,14 +55,26 @@ instance LilypondRenderable Octave where
     | o < 3  = concat $ take (3-o) $ repeat ","
     | o > 3  = concat $ take (o-3) $ repeat "'"
 
+
+lconcat = intercalate " "
+
+toScore :: Music Pitch -> Score
+toScore m = Score{clef="treble", fragments=[f]}
+  where
+    f = toLilypond $ removeZeros $ m
+
 -- TODO: there's many more bells and whistles, like scales and tempi:
 -- http://lilypond.org/doc/v2.18/Documentation/learning/simple-notation#all-together
-renderScore :: ScoreFragment -> String
-renderScore sf = "{ \\clef treble " ++ sf ++ "}"
+renderScore :: Score -> String
+renderScore s = nlconcat ["{", clefRender, fragmentsRender, "}"]
+  where
+    clefRender    = lconcat ["\\clef", (clef s)]
+    fragmentsRender = nlconcat (fragments s)
+    nlconcat        = intercalate "\n"
 
-renderScoreFile :: String -> String -> IO ()
-renderScoreFile s n = do
-  writeFile (n ++ ".ly") s
+writeScore :: Score -> String -> IO ()
+writeScore s n = do
+  writeFile (n ++ ".ly") (renderScore s)
   callCommand $ concat ["~/bin/lilypond ", n, ".ly"]
 
 {-
