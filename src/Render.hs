@@ -22,8 +22,6 @@ data Score = Score { clef :: String
 class LilypondRenderable a where
   toLilypond :: a -> ScoreFragment
 
-
-
 instance LilypondRenderable Pitch where
   toLilypond (pc, o) = concat [toLilypond pc, toLilypond o]
 
@@ -66,6 +64,13 @@ showChord (m :=: ms) =
     toL (y :=: ys)   = lconcat [toLilypond (getPitch y), toL ys]
     getPitch (Prim (Note _ p)) = p
     getDur   (Prim (Note d _)) = d
+
+-- TODO: add a ToScore class that generates a score from scales and chords
+-- the method provided there has a context of the scale, so before generating the score
+-- it can get rid of enharmonics that make a note repeat in the scale
+
+
+-- also: http://lilypond.org/doc/v2.19/Documentation/notation/displaying-chords
 
 lconcat = intercalate " "
 
