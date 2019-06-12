@@ -53,7 +53,7 @@ data Interval = PerfectUnison   -- DiminishedSecond
 data Chord = Chord { intervals :: [Interval]
                    , degree    :: Degree
                    , scale     :: Scale
-                   } deriving (Eq)
+                   } deriving (Show, Eq)
 
 
 scaleDegree :: Chord -> Pitch
@@ -109,11 +109,10 @@ degreeName c@(Chord intervals degree _) =
 -- relative to its producing scale:
 -- λ> cMajScale = majorScale $ (C,4)
 -- λ> cMin = Chord minorTriad Tonic cMajScale
--- λ> cMin
+-- λ> label cMin
 -- Cmin (i)
-
-instance Show Chord where
-  show c = (chordName c) ++ " (" ++ (degreeName c) ++ ")"
+label :: Chord -> String
+label c = (chordName c) ++ " (" ++ (degreeName c) ++ ")"
 
 -- Given a set of pitches and a scale, try to guess the chord they imply/make
 -- e.g.
