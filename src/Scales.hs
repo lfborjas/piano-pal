@@ -23,6 +23,25 @@ data Scale = Scale { steps :: [Step]
 instance Show Scale where
   show s = intercalate " " $ map show $ pitchClasses s
 
+
+accidentalsMap =  [ (C, [Cff, Cf, C, Cs, Css])
+                  , (D, [Dff, Df, D, Ds, Dss])
+                  , (E, [Eff, Ef, E, Es, Ess])
+                  , (F, [Fff, Ff, F, Fs, Fss])
+                  , (G, [Gff, Gf, G, Gs, Gss])
+                  , (A, [Aff, Af, A, As, Ass])
+                  , (B, [Bff, Bf, B, Bs, Bss])
+                  ]
+
+findAccidentals :: PitchClass -> (PitchClass, [PitchClass])
+findAccidentals pc = head $ filter ((elem pc) . snd) accidentalsMap
+
+natural :: PitchClass -> PitchClass
+natural  = fst . findAccidentals
+
+accidentals :: PitchClass -> [PitchClass]
+accidentals = snd . findAccidentals
+
 pitchClasses :: Scale -> [PitchClass]
 pitchClasses s = if (noteCount s) == 7 then
                    diatonicPitchClasses s
@@ -38,7 +57,21 @@ genericPitchClasses s = map fst $ take (noteCount s) $ pitches s
 -- diatonic scales often have seven notes and thus can afford to have one different
 -- "note" per degree, vs. a note followed by its accidental
 diatonicPitchClasses :: Scale -> [PitchClass]
-diatonicPitchClasses = genericPitchClasses -- TODO!
+diatonicPitchClasses s = stepPCs (genericPitchClasses s) [] []
+
+stepPCs :: [PitchClass] -> [PitchClass] -> [PitchClass] -> [PitchClass]
+stepPCs [] pcs _ = pcs
+stepPCs (p:ps) pcs nacc = stepPCs ps (pcs ++ [(resolvePC p nacc)]) (nacc ++ [(natural p)])
+
+resolvePC :: PitchClass -> [PitchClass] -> PitchClass
+resolvePC pc nacc =
+  if (natural pc) `elem` nacc then
+    findEnharmonic pc
+  else
+    pc
+  where
+    findEnharmonic pc   = head $ filter (isEnharmonic pc) (accidentals $ succ $ last nacc)
+    isEnharmonic   pc x = (absPitch (pc, 0)) == (absPitch (x,0))
 
 degreePitchClass :: Scale -> Degree -> PitchClass
 degreePitchClass scale degree =
@@ -48,6 +81,8 @@ degreePitch :: Scale -> Degree -> Pitch
 degreePitch scale degree =
   pitches scale !! fromEnum degree
 
+rootPitch  s = head $ pitches s
+notes      s = take (noteCount s) $ pitches s
 -- | Generates an infinite list of pitches within the provided scale
 pitches :: Scale -> [Pitch]
 pitches s =
