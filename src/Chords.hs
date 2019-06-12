@@ -1,18 +1,11 @@
 module Chords where
 
 import Euterpea
-import Scales
+import qualified Scales as Scales
 import Data.Char (toLower)
 import Data.List (intercalate, elemIndex)
 
-data Degree = Tonic       -- I
-            | Supertonic  -- II
-            | Mediant     -- III
-            | Subdominant -- IV
-            | Dominant    -- V
-            | Submediant  -- VI
-            | LeadingTone -- VII (Subtonic in the natural minor scale)
-            deriving (Show, Eq, Ord, Enum)
+
 
 -- From: https://en.wikipedia.org/wiki/Chord_(music)#Examples
 -- And: https://en.wikipedia.org/wiki/Interval_(music)#Main_intervals
@@ -51,14 +44,9 @@ data Interval = PerfectUnison   -- DiminishedSecond
 -- e.g. (Dominant, majorTriad) == V
 -- (Submediant, minorTriad) == vi
 data Chord = Chord { intervals :: [Interval]
-                   , degree    :: Degree
-                   , scale     :: Scale
+                   , degree    :: Scales.Degree
+                   , scale     :: Scales.Scale
                    } deriving (Show, Eq)
-
-
-scaleDegree :: Chord -> Pitch
-scaleDegree (Chord _ degree scale) =
-  (scaleOctave scale) !! (fromEnum degree)
 
 
 -- TODO: add ability to cycle infinitely!
@@ -67,14 +55,19 @@ pitches :: Chord -> [Pitch]
 pitches c@(Chord intervals degree scale) =
   map (stepInterval start) intervals
   where
-    start = scaleDegree c
+    start = Scales.degreePitch scale degree
+
+treblePitches, bassPitches, pitches' :: Chord -> [Pitch]
+treblePitches c = Scales.movePitches 4 $ pitches c -- start on the same octave as the treble clef (centered around G4)
+bassPitches   c = Scales.movePitches 2 $ pitches c-- start on the lowest non-ledgered C in the bass cleff (C2)
+pitches'        = treblePitches -- by default, prefer the treble clef
 
 -- Given a fully configured chord, return a common name
 chordName :: Chord -> String
-chordName c@(Chord intervals _ _) =
+chordName c@(Chord intervals d s) =
   (show pc) ++ (mkName intervals)
   where
-    (pc,_) = scaleDegree c
+    pc = Scales.degreePitchClass s d
     mkName i
       | i == majorTriad = ""
       | i == majorSixth = "maj6"
@@ -119,19 +112,21 @@ label c = (chordName c) ++ " (" ++ (degreeName c) ++ ")"
 -- λ> cMajScale = majorScale $ (C,4)
 -- λ> fromPitches [(C,4), (E,4), (G,4)] cMajScale
 -- Just C (I)
-fromPitches :: [Pitch] -> Scale -> Maybe Chord
-fromPitches pitches scale =
-  case ((head pitches) `elemIndex` scale) of
-    Just degree -> Just $ Chord (getIntervals pitches scale) (toEnum (degree `mod` 7)) scale
-    Nothing -> Nothing
-
-getIntervals :: [Pitch] -> Scale -> [Interval]
-getIntervals pitches scale =
+fromPitches :: [Pitch] -> Scales.Scale -> Maybe Chord
+fromPitches ps scale =
   let
-    root = scaleDegree $ Chord [] Tonic scale
-    rootAP = absPitch root
+    ps' = Scales.normalizePitches ps
   in
-    map (toEnum . (subtract rootAP) . absPitch) pitches
+    case ((head ps') `elemIndex` (Scales.pitches scale)) of
+      Just degreeN -> Just $ Chord (getIntervals ps' scale) (toEnum degreeN) scale
+      Nothing -> Nothing
+
+getIntervals :: [Pitch] -> Scales.Scale -> [Interval]
+getIntervals ps scale =
+  let
+    rootAP = absPitch ((Scales.root scale), 0)
+  in
+    map (toEnum . (subtract rootAP) . absPitch) ps
   
 -- Given a starting pitch and an interval, produce the pitch
 -- found at the end of that interval
@@ -148,7 +143,7 @@ stepInterval start interval = pitch (startAP + intervalAP)
 toMusic :: Dur -> Chord -> Music Pitch
 toMusic d c = chord notes
   where
-    notes = map (note d) (pitches c)
+    notes = map (note d) (pitches' c)
 
 -- Given a duration for all chords, a scale and a number of "chord constructors"
 -- generate a progression
@@ -156,7 +151,7 @@ toMusic d c = chord notes
 -- λ> cMajScale = minorScale $ (C,4)
 -- λ> toProgression qn cMajScale [_I, _ii, _V]
 -- λ> play $ toProgression qn cMajScale [_I, _ii, _V]
-toProgression :: Dur -> Scale -> [(Scale -> Chord)] -> Music Pitch
+toProgression :: Dur -> Scales.Scale -> [(Scales.Scale -> Chord)] -> Music Pitch
 toProgression d scale figures =
   line chords
   where
@@ -217,9 +212,9 @@ halfDimSeventhChord = Chord halfDimSeventh
 -- λ> cMajScale = majorScale $ (C,4)
 -- λ> _I cMajScale
 -- [(C,4),(E,4),(G,4)]
-_I   = Chord majorTriad Tonic
-_IV  = Chord majorTriad Subdominant
-_V   = Chord majorTriad Dominant
-_ii  = Chord minorTriad Supertonic
-_iii = Chord minorTriad Mediant
-_vi  = Chord minorTriad Submediant
+_I   = Chord majorTriad Scales.Tonic
+_IV  = Chord majorTriad Scales.Subdominant
+_V   = Chord majorTriad Scales.Dominant
+_ii  = Chord minorTriad Scales.Supertonic
+_iii = Chord minorTriad Scales.Mediant
+_vi  = Chord minorTriad Scales.Submediant
