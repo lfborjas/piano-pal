@@ -60,17 +60,19 @@ diatonicPitchClasses :: Scale -> [PitchClass]
 diatonicPitchClasses s = stepPCs (genericPitchClasses s) [] []
 
 stepPCs :: [PitchClass] -> [PitchClass] -> [PitchClass] -> [PitchClass]
-stepPCs [] pcs _ = pcs
-stepPCs (p:ps) pcs nacc = stepPCs ps (pcs ++ [(resolvePC p nacc)]) (nacc ++ [(natural p)])
+stepPCs [] [] _ = []
+stepPCs [] ps@(pc:pcs) nacc = reverse $ ps
+stepPCs (p:ps) pcs nacc  = stepPCs ps ((resolvePC p nacc):pcs) ((natural p):nacc)
 
 resolvePC :: PitchClass -> [PitchClass] -> PitchClass
-resolvePC pc nacc =
+resolvePC pc [] = pc
+resolvePC pc nacc@(n:ns) =
   if (natural pc) `elem` nacc then
     findEnharmonic pc
   else
     pc
   where
-    findEnharmonic pc   = head $ filter (isEnharmonic pc) (accidentals $ succ $ last nacc)
+    findEnharmonic pc   = head $ filter (isEnharmonic pc) (accidentals $ succ $ n)
     isEnharmonic   pc x = (absPitch (pc, 0)) == (absPitch (x,0))
 
 degreePitchClass :: Scale -> Degree -> PitchClass
