@@ -1,7 +1,7 @@
 module Scales where
 
 import Euterpea
-import Data.List (intercalate)
+import Data.List (intercalate, lookup)
 
 data Step = Half
           | Whole
@@ -24,6 +24,37 @@ instance Show Scale where
   show s = intercalate " " $ map show $ pitchClasses s
 
 
+-- from: https://en.wikipedia.org/wiki/Relative_key
+newtype KeySignature = KeySignature { _getPitchClasses :: [PitchClass] } deriving (Eq, Show)
+
+diatonicSignatures :: [ (PitchClass, KeySignature) ]
+-- notice that there's three extra tones: this is because notationally
+-- there's a preference for certain enharmonics: B's signature over Cflat,
+-- and Dflat over Csharp; and Gflat and Fsharp have the same number of accidentals.
+-- All the other keys not included here are "theoretical" (the enharmonic
+-- is more straightforward to play/notate, for example, Dsharp vs Eflat:
+-- https://www.basicmusictheory.com/d-sharp-major-key-signature)
+diatonicSignatures  = [ (Cf, Scales.KeySignature [Bf, Ef, Af, Df, Gf, Cf, Ff])
+                      , (Gf, Scales.KeySignature [Bf, Ef, Af, Df, Gf, Cf])
+                      , (Df, Scales.KeySignature [Bf, Ef, Af, Df, Gf])
+                      , (Af, Scales.KeySignature [Bf, Ef, Af, Df])
+                      , (Ef, Scales.KeySignature [Bf, Ef, Af])
+                      , (Bf, Scales.KeySignature [Bf, Ef])
+                      , (F,  Scales.KeySignature [Bf])
+                      , (C,  Scales.KeySignature [])
+                      , (G,  Scales.KeySignature [Fs])
+                      , (D,  Scales.KeySignature [Fs, Cs])
+                      , (A,  Scales.KeySignature [Fs, Cs, Gs])
+                      , (E,  Scales.KeySignature [Fs, Cs, Gs, Ds])
+                      , (B,  Scales.KeySignature [Fs, Cs, Gs, Ds, As])
+                      , (Fs, Scales.KeySignature [Fs, Cs, Gs, Ds, As, Es])
+                      , (Cs, Scales.KeySignature [Fs, Cs, Gs, Ds, As, Es, Bs])
+                      ]
+
+isMajor, isMinor :: Scale -> Bool
+isMajor s = s == (parallelMajor s)
+isMinor s = s == (parallelMinor s)
+
 -- | Relationships between scales:
 -- https://en.wikipedia.org/wiki/Closely_related_key
 
@@ -31,35 +62,22 @@ supertonicRelative, mediantRelative, subdominantRelative,
   dominantRelative, submediantRelative, relativeMinor :: Scale -> Scale
 
 -- relative minor of the subdominant
-supertonicRelative  s = minorScale $ degreePitchClass s Supertonic
+supertonicRelative  s = minorScale $ s `pitchClassAt` Supertonic
 -- relative minor of the dominant
-mediantRelative     s = minorScale $ degreePitchClass s Mediant
+mediantRelative     s = minorScale $ s `pitchClassAt` Mediant
 -- one less sharp/one more flat around the circle of fifths
-subdominantRelative s = majorScale $ degreePitchClass s Subdominant
+subdominantRelative s = majorScale $ s `pitchClassAt` Subdominant
 -- one more sharp/one fewer flat around the circle of fifths
-dominantRelative    s = majorScale $ degreePitchClass s Dominant
+dominantRelative    s = majorScale $ s `pitchClassAt` Dominant
 -- different tonic, same key signature
-submediantRelative  s = minorScale $ degreePitchClass s Submediant
+submediantRelative  s = minorScale $ s `pitchClassAt` Submediant
 relativeMinor         = submediantRelative
 
+-- from: https://en.wikipedia.org/wiki/Parallel_key
+parallelMajor, parallelMinor :: Scale -> Scale
+parallelMajor s = majorScale $ s `pitchClassAt` Tonic
+parallelMinor s = minorScale $ s `pitchClassAt` Tonic
 
-accidentalsMap =  [ (C, [Cff, Cf, C, Cs, Css])
-                  , (D, [Dff, Df, D, Ds, Dss])
-                  , (E, [Eff, Ef, E, Es, Ess])
-                  , (F, [Fff, Ff, F, Fs, Fss])
-                  , (G, [Gff, Gf, G, Gs, Gss])
-                  , (A, [Aff, Af, A, As, Ass])
-                  , (B, [Bff, Bf, B, Bs, Bss])
-                  ]
-
-findAccidentals :: PitchClass -> (PitchClass, [PitchClass])
-findAccidentals pc = head $ filter ((elem pc) . snd) accidentalsMap
-
-natural :: PitchClass -> PitchClass
-natural  = fst . findAccidentals
-
-accidentals :: PitchClass -> [PitchClass]
-accidentals = snd . findAccidentals
 
 pitchClasses :: Scale -> [PitchClass]
 pitchClasses s = if (noteCount s) == 7 then
@@ -78,27 +96,27 @@ genericPitchClasses s = map fst $ take (noteCount s) $ pitches s
 -- roughly based on: https://en.wikipedia.org/wiki/Diatonic_and_chromatic#Diatonic_scales
 -- and: https://en.wikipedia.org/wiki/Key_signature
 diatonicPitchClasses :: Scale -> [PitchClass]
-diatonicPitchClasses s = stepPCs (genericPitchClasses s) [] []
+diatonicPitchClasses s = case (lookup (root s) diatonicSignatures) of
+  Just accidentals -> map (replaceEnharmonic accidentals) (genericPitchClasses s)
+  Nothing          -> genericPitchClasses s -- it's a theoretical scale, leave alone.
 
-stepPCs :: [PitchClass] -> [PitchClass] -> [PitchClass] -> [PitchClass]
-stepPCs [] [] _ = []
-stepPCs [] ps@(pc:pcs) nacc = reverse $ ps
-stepPCs (p:ps) pcs nacc  = stepPCs ps ((resolvePC p nacc):pcs) ((natural p):nacc)
+replaceEnharmonic :: KeySignature -> PitchClass -> PitchClass
+replaceEnharmonic substitutes pc = if (null substitutions) then
+                                     pc
+                                   else
+                                     head substitutions
+  where substitutions = filter (isEnharmonic pc) (_getPitchClasses substitutes)
 
-resolvePC :: PitchClass -> [PitchClass] -> PitchClass
-resolvePC pc [] = pc
-resolvePC pc nacc@(n:ns) =
-  if (natural pc) `elem` nacc then
-    findEnharmonic pc
-  else
-    pc
-  where
-    findEnharmonic pc   = head $ filter (isEnharmonic pc) (accidentals $ succ $ n)
-    isEnharmonic   pc x = (absPitch (pc, 0)) == (absPitch (x,0))
+isEnharmonic :: PitchClass -> PitchClass -> Bool
+isEnharmonic a b = a /= b && pitchA == pitchB
+  where pitchA = absPitch (a,0)
+        pitchB = absPitch (b,0)
 
 degreePitchClass :: Scale -> Degree -> PitchClass
 degreePitchClass scale degree =
   (pitchClasses scale) !! (fromEnum degree)
+
+pitchClassAt = degreePitchClass
 
 degreePitch :: Scale -> Degree -> Pitch
 degreePitch scale degree =
