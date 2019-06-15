@@ -17,11 +17,30 @@ data Degree = Tonic       -- I
             deriving (Show, Eq, Ord, Enum)
 
 data Scale = Scale { steps :: [Step]
-                   ,root  :: PitchClass
+                   , root  :: PitchClass
                    } deriving (Eq, Ord)
 
 instance Show Scale where
   show s = intercalate " " $ map show $ pitchClasses s
+
+
+-- | Relationships between scales:
+-- https://en.wikipedia.org/wiki/Closely_related_key
+
+supertonicRelative, mediantRelative, subdominantRelative,
+  dominantRelative, submediantRelative, relativeMinor :: Scale -> Scale
+
+-- relative minor of the subdominant
+supertonicRelative  s = minorScale $ degreePitchClass s Supertonic
+-- relative minor of the dominant
+mediantRelative     s = minorScale $ degreePitchClass s Mediant
+-- one less sharp/one more flat around the circle of fifths
+subdominantRelative s = majorScale $ degreePitchClass s Subdominant
+-- one more sharp/one fewer flat around the circle of fifths
+dominantRelative    s = majorScale $ degreePitchClass s Dominant
+-- different tonic, same key signature
+submediantRelative  s = minorScale $ degreePitchClass s Submediant
+relativeMinor         = submediantRelative
 
 
 accidentalsMap =  [ (C, [Cff, Cf, C, Cs, Css])
@@ -56,6 +75,8 @@ genericPitchClasses s = map fst $ take (noteCount s) $ pitches s
 
 -- diatonic scales often have seven notes and thus can afford to have one different
 -- "note" per degree, vs. a note followed by its accidental
+-- roughly based on: https://en.wikipedia.org/wiki/Diatonic_and_chromatic#Diatonic_scales
+-- and: https://en.wikipedia.org/wiki/Key_signature
 diatonicPitchClasses :: Scale -> [PitchClass]
 diatonicPitchClasses s = stepPCs (genericPitchClasses s) [] []
 
