@@ -25,6 +25,7 @@ dependencies:
 - PortMidi # Euterpea dependency
 - arrows # Euterpea dependency
 - process
+- containers
 
 library:
   source-dirs: src
