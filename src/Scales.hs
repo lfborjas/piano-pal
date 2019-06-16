@@ -112,11 +112,61 @@ pitchClasses s = map fst $ take (noteCount s) $ pitches s
 -- "note" per degree, vs. a note followed by its accidental
 -- roughly based on: https://en.wikipedia.org/wiki/Diatonic_and_chromatic#Diatonic_scales
 -- and: https://en.wikipedia.org/wiki/Key_signature
-diatonicPitchClasses :: Scale -> [PitchClass]
+diatonicPitchClasses, diatonicPitchClasses' :: Scale -> [PitchClass]
 diatonicPitchClasses s =
   case getKeySignature s of
     Just accidentals -> map (replaceEnharmonic (_getPitchClasses accidentals)) (pitchClasses s)
     Nothing          -> pitchClasses s -- it's non-diatonic (more notes, weird intervals, etc), leave alone.
+
+
+
+accidentalsMap =  [ (C, [Cff, Cf, C, Cs, Css])
+                  , (D, [Dff, Df, D, Ds, Dss])
+                  , (E, [Eff, Ef, E, Es, Ess])
+                  , (F, [Fff, Ff, F, Fs, Fss])
+                  , (G, [Gff, Gf, G, Gs, Gss])
+                  , (A, [Aff, Af, A, As, Ass])
+                  , (B, [Bff, Bf, B, Bs, Bss])
+                  ]
+
+findAccidentals :: PitchClass -> (PitchClass, [PitchClass])
+findAccidentals pc = head $ filter ((elem pc) . snd) accidentalsMap
+
+natural :: PitchClass -> PitchClass
+natural  = fst . findAccidentals
+
+accidentals :: PitchClass -> [PitchClass]
+accidentals = snd . findAccidentals
+
+rotateAround p ps@(x@(q,_):xs)
+  | (natural p) == q = ps
+  | otherwise        = rotateAround p (xs ++ [x])
+  
+
+diatonicPitchClasses' s =
+  let
+    r = root s
+    candidates = tail $ map fst $ rotateAround (root s) accidentalsMap
+  in
+    case (stepPCs [r] candidates (tail $ notes s)) of
+      Nothing  -> pitchClasses s
+      Just pcs -> pcs
+
+-- rotate through the naturals starting at the note's natural
+-- and then exhaust that list; instead of starting from scratch.
+stepPCs ::
+  [PitchClass]       -> -- accumulator (pitch classes found so far)
+  [PitchClass]       -> -- candidate pitch classes
+  [Pitch]            -> -- pitches of the scale yet to find a pitch class for
+  Maybe [PitchClass] -- if there's enough unique pitch classes, return; if not, give up
+stepPCs _ (x:xs) []   = Nothing -- ran out of pitches, still have candidates
+stepPCs _   [] (y:ys) = Nothing -- ran out of candidates, still have pitches
+stepPCs pcs []   []   = Just $ reverse pcs -- seems like we exhausted both lists and found something!
+stepPCs pcs (c:cs) (p:ps) =
+  stepPCs (found:pcs) cs ps
+  where
+    found = findEnharmonic p (accidentals c)
+    findEnharmonic (pc, o) a = head $ filter (isEnharmonic pc) a
 
 -- the key signature for a melodic and harmonic minor is still
 -- that which corresponds to its natural equivalent:
@@ -145,7 +195,7 @@ replaceEnharmonic substitutes pc = if (null substitutions) then
   where substitutions = filter (isEnharmonic pc) substitutes
 
 isEnharmonic :: PitchClass -> PitchClass -> Bool
-isEnharmonic a b = a /= b && pitchA == pitchB
+isEnharmonic a b = pitchA == pitchB
   where pitchA = absPitch (a,0) `mod` 12
         pitchB = absPitch (b,0) `mod` 12
 

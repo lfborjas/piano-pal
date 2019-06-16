@@ -48,7 +48,23 @@ majorScales = [ ( majorScale C  , [ C,D,E,F,G,A,B ])
               , ( majorScale Af  , [ Af,Bf,C,Df,Ef,F,G ]) 
               , ( majorScale Df  , [ Df,Ef,F,Gf,Af,Bf,C ]) 
               , ( majorScale Gf  , [ Gf,Af,Bf,Cf,Df,Ef,F ]) 
-              , ( majorScale Cf  , [ Cf,Df,Ef,Ff,Gf,Af,Bf ]) 
+              , ( majorScale Cf  , [ Cf,Df,Ef,Ff,Gf,Af,Bf ])
+              -- weird major scales where the enharmonic is usually preferred
+              , ( majorScale Ds , [ Ds,Es,Fss,Gs,As,Bs,Css ]) 
+              , ( majorScale Es , [ Es,Fss,Gss,As,Bs,Css,Dss ]) 
+              , ( majorScale Ff , [ Ff,Gf,Af,Bff,Cf,Df,Ef ]) 
+              , ( majorScale Gs , [ Gs,As,Bs,Cs,Ds,Es,Fss ]) 
+              , ( majorScale As , [ As,Bs,Css,Ds,Es,Fss,Gss ]) 
+              , ( majorScale Bs , [ Bs,Css,Dss,Es,Fss,Gss,Ass ]) 
+              , ( majorScale Css , [ Css,Dss,Ess,Fss,Gss,Ass,Bss ]) 
+              , ( majorScale Dff , [ Dff,Eff,Ff,Gff,Aff,Bff,Cf ]) 
+              --, ( majorScale Dss , [ Dss,Ess,Fsss,Gss,Ass,Bss,Csss ]) 
+              , ( majorScale Eff , [ Eff,Ff,Gf,Aff,Bff,Cf,Df ]) 
+              , ( majorScale Fss , [ Fss,Gss,Ass,Bs,Css,Dss,Ess ]) 
+              -- , ( majorScale Gss , [ Gss,Ass,Bss,Css,Dss,Ess,Fsss ]) 
+              , ( majorScale Aff , [ Aff,Bff,Cf,Dff,Eff,Ff,Gf ]) 
+              --, ( majorScale Ass , [ Ass,Bss,Csss,Dss,Ess,Fsss,Gsss ]) 
+              , ( majorScale Bff , [ Bff,Cf,Df,Eff,Ff,Gf,Af ]) 
               ]
 
 minorScales = [ ( minorScale A  , [ A,B,C,D,E,F,G ]) 
@@ -65,8 +81,34 @@ minorScales = [ ( minorScale A  , [ A,B,C,D,E,F,G ])
               , ( minorScale F  , [ F,G,Af,Bf,C,Df,Ef ]) 
               , ( minorScale Bf  , [ Bf,C,Df,Ef,F,Gf,Af ]) 
               , ( minorScale Ef  , [ Ef,F,Gf,Af,Bf,Cf,Df ]) 
-              , ( minorScale Af  , [ Af,Bf,Cf,Df,Ef,Ff,Gf ]) 
+              , ( minorScale Af  , [ Af,Bf,Cf,Df,Ef,Ff,Gf ])
+              -- weird scales that don't usually show up (enharmonics are preferred:)
+              , ( minorScale Df , [ Df,Ef,Ff,Gf,Af,Bff,Cf ]) 
+              , ( minorScale Es , [ Es,Fss,Gs,As,Bs,Cs,Ds ]) 
+              , ( minorScale Ff , [ Ff,Gf,Aff,Bff,Cf,Dff,Eff ]) 
+              , ( minorScale Gf , [ Gf,Af,Bff,Cf,Df,Eff,Ff ]) 
+              , ( minorScale Bs , [ Bs,Css,Ds,Es,Fss,Gs,As ]) 
+              , ( minorScale Cf , [ Cf,Df,Eff,Ff,Gf,Aff,Bff ]) 
+              , ( minorScale Css , [ Css,Dss,Es,Fss,Gss,As,Bs ])
+              -- The Dff scale has a triple flat (B), which doesn't exist in Euterpea
+              -- , ( minorScale Dff , [ Dff,Eff,Fff,Gff,Aff,Bfff,Cff ]) 
+              , ( minorScale Dss , [ Dss,Ess,Fss,Gss,Ass,Bs,Css ]) 
+              , ( minorScale Eff , [ Eff,Ff,Gff,Aff,Bff,Cff,Dff ]) 
+              , ( minorScale Fss , [ Fss,Gss,As,Bs,Css,Ds,Es ]) 
+              , ( minorScale Gss , [ Gss,Ass,Bs,Css,Dss,Es,Fss ]) 
+              , ( minorScale Aff , [ Aff,Bff,Cff,Dff,Eff,Fff,Gff ]) 
+              , ( minorScale Ass , [ Ass,Bss,Css,Dss,Ess,Fss,Gss ]) 
+              , ( minorScale Bff , [ Bff,Cf,Dff,Eff,Ff,Gff,Aff ]) 
               ]
+
+-- These scales contain triple accidentals which, while valid in music, aren't supported in Euterpea
+-- considering that they're rare enough, I'm choosing to let them have repeated pitch classes
+-- vs. upheaving the Euterpea approach
+-- unsupportedScales = [ ( majorScale Dss , [ Dss,Ess,Fsss,Gss,Ass,Bss,Csss ]) 
+--                     , ( majorScale Gss , [ Gss,Ass,Bss,Css,Dss,Ess,Fsss ])
+--                     , ( majorScale Ass , [ Ass,Bss,Csss,Dss,Ess,Fsss,Gsss ])
+--                     , ( minorScale Dff , [ Dff,Eff,Fff,Gff,Aff,Bfff,Cff ]) 
+--                     ]
 
 spec :: Spec
 spec =  do
@@ -77,5 +119,5 @@ spec =  do
           (show $ root scale)++" "++
           (mode scale)++" scale as %s" ++
           ( show expectedPitchClasses )) $ do
-        diatonicPitchClasses scale `shouldBe` expectedPitchClasses
+        diatonicPitchClasses' scale `shouldBe` expectedPitchClasses
       
