@@ -68,8 +68,8 @@ standardKeySignature pc =
                                         lookupEnharmonic p next
 
 isMajor, isMinor :: Scale -> Bool
-isMajor s = s == (parallelMajor s)
-isMinor s = s == (parallelMinor s) || s == (harmonicMinor s) || s == (melodicMinor s)
+isMajor s = (steps s) == majorScaleSteps
+isMinor s = (steps s) == minorScaleSteps || s == (harmonicMinor s) || s == (melodicMinor s)
   where
     harmonicMinor s = harmonicMinorScale $ s `pitchClassAt` Tonic
     melodicMinor  s = melodicMinorAscending $ s `pitchClassAt` Tonic
@@ -127,6 +127,12 @@ getKeySignature s
   | isMinor s = standardKeySignature $ root (relativeMajor s)
   | otherwise = Nothing
 
+mode :: Scale -> String
+mode s
+  | isMajor s = "major"
+  | isMinor s = "minor"
+  | otherwise = ""
+
 
 -- Given a set of possible subsitutes, and a pitch class,
 -- replace the pitch class with the first of the substitutes
@@ -140,8 +146,8 @@ replaceEnharmonic substitutes pc = if (null substitutions) then
 
 isEnharmonic :: PitchClass -> PitchClass -> Bool
 isEnharmonic a b = a /= b && pitchA == pitchB
-  where pitchA = absPitch (a,0)
-        pitchB = absPitch (b,0)
+  where pitchA = absPitch (a,0) `mod` 12
+        pitchB = absPitch (b,0) `mod` 12
 
 degreePitchClass :: Scale -> Degree -> PitchClass
 degreePitchClass scale degree =
@@ -206,13 +212,13 @@ pianoScale scale =
 
 -- | HELPER FUNCTIONS: scale builders/slicers
 
+majorScaleSteps = [Whole,Whole,Half,Whole,Whole,Whole,Half]
+minorScaleSteps = [Whole,Half,Whole,Whole,Half,Whole,Whole]
+
 majorScale, minorScale, harmonicMinorScale,
   melodicMinorAscending, melodicMinorDescending :: PitchClass -> Scale
-
-majorScale             = Scale [Whole,Whole,Half,Whole,Whole,Whole,Half]
-minorScale             = Scale [Whole,Half,Whole,Whole,Half,Whole,Whole]
+majorScale             = Scale majorScaleSteps
+minorScale             = Scale minorScaleSteps
 harmonicMinorScale     = Scale [Whole,Half,Whole,Whole,Half,AugmentedSecond,Half]
 melodicMinorAscending  = Scale [Whole,Half,Whole,Whole,Whole,Whole,Half]
 melodicMinorDescending = minorScale
-
--- TODO: add church modes!
