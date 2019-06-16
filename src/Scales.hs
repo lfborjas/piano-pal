@@ -3,8 +3,11 @@ module Scales where
 import Euterpea
 import Data.List (intercalate, lookup)
 
+-- these are actually just aliases for some main intervals:
+-- https://en.wikipedia.org/wiki/Interval_(music)#Main_intervals
 data Step = Half
           | Whole
+          | AugmentedSecond
           deriving (Show, Eq, Ord, Enum)
 
 data Degree = Tonic       -- I
@@ -66,7 +69,10 @@ standardKeySignature pc =
 
 isMajor, isMinor :: Scale -> Bool
 isMajor s = s == (parallelMajor s)
-isMinor s = s == (parallelMinor s)
+isMinor s = s == (parallelMinor s) || s == (harmonicMinor s) || s == (melodicMinor s)
+  where
+    harmonicMinor s = harmonicMinorScale $ s `pitchClassAt` Tonic
+    melodicMinor  s = melodicMinorAscending $ s `pitchClassAt` Tonic
 
 -- | Relationships between scales:
 -- https://en.wikipedia.org/wiki/Closely_related_key
@@ -112,6 +118,9 @@ diatonicPitchClasses s =
     Just accidentals -> map (replaceEnharmonic (_getPitchClasses accidentals)) (pitchClasses s)
     Nothing          -> pitchClasses s -- it's non-diatonic (more notes, weird intervals, etc), leave alone.
 
+-- the key signature for a melodic and harmonic minor is still
+-- that which corresponds to its natural equivalent:
+-- https://en.wikipedia.org/wiki/Minor_scale
 getKeySignature :: Scale -> Maybe KeySignature
 getKeySignature s
   | isMajor s = standardKeySignature $ root s
@@ -168,8 +177,6 @@ treblePitches s = movePitches 4 $ pitches s -- start on the same octave as the t
 bassPitches   s = movePitches 2 $ pitches s-- start on the lowest non-ledgered C in the bass cleff (C2)
 pitches'        = treblePitches -- by default, prefer the treble clef
 
-
-
 -- To play around with scales: produces a line of the first octave of the
 -- given scale
 -- e.g.
@@ -199,10 +206,13 @@ pianoScale scale =
 
 -- | HELPER FUNCTIONS: scale builders/slicers
 
-majorScale :: PitchClass -> Scale
-majorScale = Scale [Whole,Whole,Half,Whole,Whole,Whole,Half]
+majorScale, minorScale, harmonicMinorScale,
+  melodicMinorAscending, melodicMinorDescending :: PitchClass -> Scale
 
-minorScale :: PitchClass -> Scale
-minorScale = Scale [Whole,Half,Whole,Whole,Half,Whole,Whole]
+majorScale             = Scale [Whole,Whole,Half,Whole,Whole,Whole,Half]
+minorScale             = Scale [Whole,Half,Whole,Whole,Half,Whole,Whole]
+harmonicMinorScale     = Scale [Whole,Half,Whole,Whole,Half,AugmentedSecond,Half]
+melodicMinorAscending  = Scale [Whole,Half,Whole,Whole,Whole,Whole,Half]
+melodicMinorDescending = minorScale
 
--- TODO: add church modes, harmonic/melodic scales, etc.
+-- TODO: add church modes!
