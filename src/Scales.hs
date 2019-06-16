@@ -27,52 +27,12 @@ instance Show Scale where
   show s = intercalate " " $ map show $ diatonicPitchClasses s
 
 
--- from: https://en.wikipedia.org/wiki/Relative_key
-newtype KeySignature = KeySignature { _getPitchClasses :: [PitchClass] } deriving (Eq, Show)
-
--- This one's a fun one: in common practice, a few major keys (and their relative minor keys)
--- are preferred over their enharmonic equivalents for standard key signatures;
--- notice that there's three extra tones in `diatonicSignatures`: this is because notationally
--- there's a preference for certain enharmonics: B's signature over Cflat,
--- and Dflat over Csharp; and Gflat and Fsharp have the same number of accidentals.
--- All the other keys not included here are "theoretical" (the enharmonic
--- is more straightforward to play/notate, for example, Dsharp vs Eflat:
--- https://www.basicmusictheory.com/d-sharp-major-key-signature,) and, as such
--- their key signature is replaced by its enharmonic's.
-standardKeySignature :: PitchClass -> Maybe KeySignature
-standardKeySignature pc =
-  case (lookup pc diatonicSignatures) of
-    Just ks -> Just ks
-    Nothing -> lookupEnharmonic pc diatonicSignatures
-  where
-    diatonicSignatures  = [ (Cf, Scales.KeySignature [Bf, Ef, Af, Df, Gf, Cf, Ff])
-                          , (Gf, Scales.KeySignature [Bf, Ef, Af, Df, Gf, Cf])
-                          , (Df, Scales.KeySignature [Bf, Ef, Af, Df, Gf])
-                          , (Af, Scales.KeySignature [Bf, Ef, Af, Df])
-                          , (Ef, Scales.KeySignature [Bf, Ef, Af])
-                          , (Bf, Scales.KeySignature [Bf, Ef])
-                          , (F,  Scales.KeySignature [Bf])
-                          , (C,  Scales.KeySignature [])
-                          , (G,  Scales.KeySignature [Fs])
-                          , (D,  Scales.KeySignature [Fs, Cs])
-                          , (A,  Scales.KeySignature [Fs, Cs, Gs])
-                          , (E,  Scales.KeySignature [Fs, Cs, Gs, Ds])
-                          , (B,  Scales.KeySignature [Fs, Cs, Gs, Ds, As])
-                          , (Fs, Scales.KeySignature [Fs, Cs, Gs, Ds, As, Es])
-                          , (Cs, Scales.KeySignature [Fs, Cs, Gs, Ds, As, Es, Bs])
-                          ]
-    lookupEnharmonic p [] = Nothing
-    lookupEnharmonic p ((o,k):next) = if (isEnharmonic p o) then
-                                        Just k
-                                      else
-                                        lookupEnharmonic p next
-
 isMajor, isMinor :: Scale -> Bool
 isMajor s = (steps s) == majorScaleSteps
 isMinor s = (steps s) == minorScaleSteps || s == (harmonicMinor s) || s == (melodicMinor s)
   where
-    harmonicMinor s = harmonicMinorScale $ s `pitchClassAt` Tonic
-    melodicMinor  s = melodicMinorAscending $ s `pitchClassAt` Tonic
+    harmonicMinor s = harmonicMinorScale $ root s
+    melodicMinor  s = melodicMinorAscending $ root s
 
 -- | Relationships between scales:
 -- https://en.wikipedia.org/wiki/Closely_related_key
@@ -98,8 +58,8 @@ relativeMajor       s = majorScale $ s `pitchClassAt` Mediant
 
 -- from: https://en.wikipedia.org/wiki/Parallel_key
 parallelMajor, parallelMinor :: Scale -> Scale
-parallelMajor s = majorScale $ s `pitchClassAt` Tonic
-parallelMinor s = minorScale $ s `pitchClassAt` Tonic
+parallelMajor s = majorScale $ (root s)
+parallelMinor s = minorScale $ (root s)
 
 
 noteCount :: Scale -> Int
@@ -107,18 +67,6 @@ noteCount s =  length $ steps s
 
 pitchClasses :: Scale -> [PitchClass]
 pitchClasses s = map fst $ take (noteCount s) $ pitches s
-
--- diatonic scales often have seven notes and thus can afford to have one different
--- "note" per degree, vs. a note followed by its accidental
--- roughly based on: https://en.wikipedia.org/wiki/Diatonic_and_chromatic#Diatonic_scales
--- and: https://en.wikipedia.org/wiki/Key_signature
-diatonicPitchClasses, diatonicPitchClasses' :: Scale -> [PitchClass]
-diatonicPitchClasses s =
-  case getKeySignature s of
-    Just accidentals -> map (replaceEnharmonic (_getPitchClasses accidentals)) (pitchClasses s)
-    Nothing          -> pitchClasses s -- it's non-diatonic (more notes, weird intervals, etc), leave alone.
-
-
 
 accidentalsMap =  [ (C, [Cff, Cf, C, Cs, Css])
                   , (D, [Dff, Df, D, Ds, Dss])
@@ -141,9 +89,18 @@ accidentals = snd . findAccidentals
 rotateAround p ps@(x@(q,_):xs)
   | (natural p) == q = ps
   | otherwise        = rotateAround p (xs ++ [x])
-  
 
-diatonicPitchClasses' s =
+isEnharmonic :: PitchClass -> PitchClass -> Bool
+isEnharmonic a b = pitchA == pitchB
+  where pitchA = absPitch (a,0) `mod` 12
+        pitchB = absPitch (b,0) `mod` 12
+  
+-- diatonic scales often have seven notes and thus can afford to have one different
+-- "note" per degree, vs. a note followed by its accidental
+-- roughly based on: https://en.wikipedia.org/wiki/Diatonic_and_chromatic#Diatonic_scales
+-- and: https://en.wikipedia.org/wiki/Key_signature
+diatonicPitchClasses :: Scale -> [PitchClass]
+diatonicPitchClasses s =
   let
     r = root s
     candidates = tail $ map fst $ rotateAround (root s) accidentalsMap
@@ -176,37 +133,11 @@ stepPCs pcs (c:cs) (p:ps) = case (findEnharmonic p $ accidentals c) of
         else
           Nothing
 
-
--- the key signature for a melodic and harmonic minor is still
--- that which corresponds to its natural equivalent:
--- https://en.wikipedia.org/wiki/Minor_scale
-getKeySignature :: Scale -> Maybe KeySignature
-getKeySignature s
-  | isMajor s = standardKeySignature $ root s
-  | isMinor s = standardKeySignature $ root (relativeMajor s)
-  | otherwise = Nothing
-
 mode :: Scale -> String
 mode s
   | isMajor s = "major"
   | isMinor s = "minor"
   | otherwise = ""
-
-
--- Given a set of possible subsitutes, and a pitch class,
--- replace the pitch class with the first of the substitutes
--- which is its enharmonic.
-replaceEnharmonic :: [PitchClass] -> PitchClass -> PitchClass
-replaceEnharmonic substitutes pc = if (null substitutions) then
-                                     pc
-                                   else
-                                     head substitutions
-  where substitutions = filter (isEnharmonic pc) substitutes
-
-isEnharmonic :: PitchClass -> PitchClass -> Bool
-isEnharmonic a b = pitchA == pitchB
-  where pitchA = absPitch (a,0) `mod` 12
-        pitchB = absPitch (b,0) `mod` 12
 
 degreePitchClass :: Scale -> Degree -> PitchClass
 degreePitchClass scale degree =
@@ -220,6 +151,7 @@ degreePitch scale degree =
 
 rootPitch  s = head $ pitches s
 notes      s = take (noteCount s) $ pitches s
+
 -- | Generates an infinite list of pitches within the provided scale
 pitches :: Scale -> [Pitch]
 pitches s =

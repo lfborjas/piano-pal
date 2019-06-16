@@ -123,5 +123,5 @@ spec =  do
           (show $ root scale)++" "++
           (mode scale)++" scale as %s" ++
           ( show expectedPitchClasses )) $ do
-        diatonicPitchClasses' scale `shouldBe` expectedPitchClasses
+        diatonicPitchClasses scale `shouldBe` expectedPitchClasses
       
