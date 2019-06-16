@@ -162,11 +162,20 @@ stepPCs ::
 stepPCs _ (x:xs) []   = Nothing -- ran out of pitches, still have candidates
 stepPCs _   [] (y:ys) = Nothing -- ran out of candidates, still have pitches
 stepPCs pcs []   []   = Just $ reverse pcs -- seems like we exhausted both lists and found something!
-stepPCs pcs (c:cs) (p:ps) =
-  stepPCs (found:pcs) cs ps
+stepPCs pcs (c:cs) (p:ps) = case (findEnharmonic p $ accidentals c) of
+  Nothing    -> Nothing
+  Just found -> stepPCs (found:pcs) cs ps
   where
     found = findEnharmonic p (accidentals c)
-    findEnharmonic (pc, o) a = head $ filter (isEnharmonic pc) a
+    findEnharmonic (pc, o) a =
+      let
+        enharmonics = filter (isEnharmonic pc) a
+      in
+        if (not $ null enharmonics) then
+          Just $ head enharmonics
+        else
+          Nothing
+
 
 -- the key signature for a melodic and harmonic minor is still
 -- that which corresponds to its natural equivalent:

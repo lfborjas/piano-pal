@@ -16,18 +16,22 @@ import Scales
 
   And ran this jquery:
 
-  replaceAccidentals = function(s){ return s.replace(/b$/, "f").replace("#", "s")}
+replaceAccidentals = function(s){ return s.replace(/b/g, "f").replace(/#/g, "s")}
 
-  jQuery("table.table-responsive tr").slice(3,18).each(
+
+jQuery("table.table-responsive tr").slice(19).each(
 function(){
   var $this, name, notes;
   $this = $(this);
-  name = replaceAccidentals($this.find("th").text().replace("natural minor scale", ""));
+  name = replaceAccidentals($this.find("th").text().replace(" major scale", ""));
   notes = $this.find("td").toArray().slice(0,-1).reduce(function(a,b){
     return a.concat(replaceAccidentals(b.innerText))
   }, []);
-  console.log(", ( minorScale", name, ", [", notes.toString(), "]) ")
+  console.log(", ( majorScale", name, ", [", notes.toString(), "]) ")
 })
+
+
+
 
   Then just copy-pasted, remove the annoying chrome linenumbers.
 
@@ -104,17 +108,17 @@ minorScales = [ ( minorScale A  , [ A,B,C,D,E,F,G ])
 -- These scales contain triple accidentals which, while valid in music, aren't supported in Euterpea
 -- considering that they're rare enough, I'm choosing to let them have repeated pitch classes
 -- vs. upheaving the Euterpea approach
--- unsupportedScales = [ ( majorScale Dss , [ Dss,Ess,Fsss,Gss,Ass,Bss,Csss ]) 
---                     , ( majorScale Gss , [ Gss,Ass,Bss,Css,Dss,Ess,Fsss ])
---                     , ( majorScale Ass , [ Ass,Bss,Csss,Dss,Ess,Fsss,Gsss ])
---                     , ( minorScale Dff , [ Dff,Eff,Fff,Gff,Aff,Bfff,Cff ]) 
---                     ]
+unsupportedScales = [ ( majorScale Dss , [ E,Fs,Gs,A,B,Cs,Ds ])
+                    , ( majorScale Gss , [ A,B,Cs,D,E,Fs,Gs])
+                    , ( majorScale Ass , [ B,Cs,Ds,E,Fs,Gs,As])
+                    , ( minorScale Dff , [ C,D,Ds,F,G,Gs,As])
+                    ]
 
 spec :: Spec
 spec =  do
   -- inspired by: https://haskell-at-work.com/episodes/2018-01-13-dynamic-test-suites-in-haskell-using-hspec-and-tasty.html
   describe "Scales.diatonicPitchClasses" $ do
-    forM_ (concat [majorScales, minorScales]) $ \(scale, expectedPitchClasses) -> do
+    forM_ (concat [majorScales, minorScales, unsupportedScales]) $ \(scale, expectedPitchClasses) -> do
       it ("constructs the "++
           (show $ root scale)++" "++
           (mode scale)++" scale as %s" ++
