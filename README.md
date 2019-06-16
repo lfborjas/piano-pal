@@ -1,6 +1,6 @@
 # Piano Pal
 
-Learning more Haskell through music and more music through Haskell: The `Scales` and `Chords` modules represent my current understanding of both concepts, and they provide functions that are useful for plugging in snippets of music found in the wild and seeing how they conform to (or diverge from) classical music theory (I'm, at the moment, daunted by jazz, folk music and other practices outside of the common practice period, sorry!)
+Learning [more Haskell through music](https://github.com/lfborjas/distractions/blob/a6b6bcd09270fa73233b05f3afb1800b977da9c3/haskell_school_of_music/README.md) and more music through Haskell: The `Scales` and `Chords` modules represent my current understanding of both concepts, and they provide functions that are useful for plugging in snippets of music found in the wild and seeing how they conform to (or diverge from) classical music theory (I'm, at the moment, daunted by jazz, folk music and other practices outside of the common practice period, sorry!)
 
 The main goal here is personal use, for now: not only am I currently mostly focused on classical music theory, I'm practicing the piano and thus a lot of helper/rendering functions are geared towards generating sheet music in a grand staff, within the piano range and with piano fingerings, to help me practice some fundamentals in the instrument, or decode some of the pieces I'm practicing (which tend to fall in the Bach-Grieg continuum, with perhaps some future incursions into twelve-tone shenanigans.)
 
