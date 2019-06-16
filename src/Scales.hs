@@ -1,7 +1,7 @@
 module Scales where
 
 import Euterpea
-import Data.List (intercalate, lookup)
+import Data.List (intercalate)
 
 -- these are actually just aliases for some main intervals:
 -- https://en.wikipedia.org/wiki/Interval_(music)#Main_intervals
@@ -26,44 +26,12 @@ data Scale = Scale { steps :: [Step]
 instance Show Scale where
   show s = intercalate " " $ map show $ diatonicPitchClasses s
 
-
-isMajor, isMinor :: Scale -> Bool
-isMajor s = (steps s) == majorScaleSteps
-isMinor s = (steps s) == minorScaleSteps || s == (harmonicMinor s) || s == (melodicMinor s)
-  where
-    harmonicMinor s = harmonicMinorScale $ root s
-    melodicMinor  s = melodicMinorAscending $ root s
-
--- | Relationships between scales:
--- https://en.wikipedia.org/wiki/Closely_related_key
-
-supertonicRelative, mediantRelative, subdominantRelative,
-  dominantRelative, submediantRelative, relativeMinor :: Scale -> Scale
-
--- | CLOSE KEYS FOR MAJOR SCALES
--- relative minor of the subdominant
-supertonicRelative  s = minorScale $ s `pitchClassAt` Supertonic
--- relative minor of the dominant
-mediantRelative     s = minorScale $ s `pitchClassAt` Mediant
--- one less sharp/one more flat around the circle of fifths
-subdominantRelative s = majorScale $ s `pitchClassAt` Subdominant
--- one more sharp/one fewer flat around the circle of fifths
-dominantRelative    s = majorScale $ s `pitchClassAt` Dominant
--- different tonic, same key signature
-submediantRelative  s = minorScale $ s `pitchClassAt` Submediant
-relativeMinor         = submediantRelative
-
--- | CLOSE KEYS FOR MINOR SCALES
-relativeMajor       s = majorScale $ s `pitchClassAt` Mediant
-
--- from: https://en.wikipedia.org/wiki/Parallel_key
-parallelMajor, parallelMinor :: Scale -> Scale
-parallelMajor s = majorScale $ (root s)
-parallelMinor s = minorScale $ (root s)
-
-
 noteCount :: Scale -> Int
 noteCount s =  length $ steps s
+
+-- | Operations on Pitch Classes, meant for inspection/reasoning/notation
+-- about scales; see the operations on Pitches below if you're more
+-- interested in the sound (vs. the looks) of a scale.
 
 pitchClasses :: Scale -> [PitchClass]
 pitchClasses s = map fst $ take (noteCount s) $ pitches s
@@ -133,17 +101,17 @@ stepPCs pcs (c:cs) (p:ps) = case (findEnharmonic p $ accidentals c) of
         else
           Nothing
 
-mode :: Scale -> String
-mode s
-  | isMajor s = "major"
-  | isMinor s = "minor"
-  | otherwise = ""
-
 degreePitchClass :: Scale -> Degree -> PitchClass
 degreePitchClass scale degree =
-  (pitchClasses scale) !! (fromEnum degree)
+  (diatonicPitchClasses scale) !! (fromEnum degree)
 
 pitchClassAt = degreePitchClass
+
+-- | Operations on pitches: purely musical (sound) values, which means that
+-- when inspected, it's not guaranteed they'll be the same pitch class
+-- one is expecting, but it may be an enharmonic -- not to use for theoretical
+-- inspection! But rather for performance or mathematical transformations
+-- (such as calculating the right pitch classes for a scale, as used above)
 
 degreePitch :: Scale -> Degree -> Pitch
 degreePitch scale degree =
@@ -177,7 +145,7 @@ pitches'        = treblePitches -- by default, prefer the treble clef
 -- To play around with scales: produces a line of the first octave of the
 -- given scale
 -- e.g.
--- λ> cMajScale = majorScale (C,4)
+-- λ> cMajScale = majorScale C
 -- λ> toMusic en cMajScale
 -- Prim (Note (1 % 8) (C,4)) :+: (Prim (Note (1 % 8) (D,4)) :+: (Prim (Note (1 % 8) (E,4)) :+: (Prim (Note (1 % 8) (F,4)) :+: (Prim (Note (1 % 8) (G,4)) :+: (Prim (Note (1 % 8) (A,4)) :+: (Prim (Note (1 % 8) (B,4)) :+: (Prim (Note (1 % 8) (C,5)) :+: Prim (Rest (0 % 1)))))))))
 -- λ> play $ toMusic en cMajScale
@@ -187,13 +155,13 @@ toMusic d scale = line notes
     notes = map (note d) $ take n $ pitches' scale
     n     = noteCount scale
 
--- | Given a lowest and highest pitches, check if a provided
+-- Given a lowest and highest pitches, check if a provided
 -- music value's pitch is within those bounds.
 inRange :: Pitch -> Pitch -> Pitch -> Bool
 inRange low high p =
   (absPitch p) >= (absPitch low) && (absPitch p) <= (absPitch high)
 
--- | Generates a finite list of notes that would fit in a piano
+-- Generates a finite list of notes that would fit in a piano
 pianoScale :: Scale -> [Pitch]
 pianoScale scale =
   takeWhile (inRange lowestPitch highestPitch) (pitches scale)
@@ -201,7 +169,7 @@ pianoScale scale =
     lowestPitch  = (A,0)
     highestPitch = (C,8)
 
--- | HELPER FUNCTIONS: scale builders/slicers
+-- | Query functions/default scales
 
 majorScaleSteps = [Whole,Whole,Half,Whole,Whole,Whole,Half]
 minorScaleSteps = [Whole,Half,Whole,Whole,Half,Whole,Whole]
@@ -213,3 +181,43 @@ minorScale             = Scale minorScaleSteps
 harmonicMinorScale     = Scale [Whole,Half,Whole,Whole,Half,AugmentedSecond,Half]
 melodicMinorAscending  = Scale [Whole,Half,Whole,Whole,Whole,Whole,Half]
 melodicMinorDescending = minorScale
+
+isMajor, isMinor :: Scale -> Bool
+isMajor s = (steps s) == majorScaleSteps
+isMinor s = (steps s) == minorScaleSteps || s == (harmonicMinor s) || s == (melodicMinor s)
+  where
+    harmonicMinor s = harmonicMinorScale $ root s
+    melodicMinor  s = melodicMinorAscending $ root s
+
+mode :: Scale -> String
+mode s
+  | isMajor s = "major"
+  | isMinor s = "minor"
+  | otherwise = ""
+
+-- | Relationships between scales:
+-- https://en.wikipedia.org/wiki/Closely_related_key
+
+supertonicRelative, mediantRelative, subdominantRelative,
+  dominantRelative, submediantRelative, relativeMinor :: Scale -> Scale
+
+-- | CLOSE KEYS FOR MAJOR SCALES
+-- relative minor of the subdominant
+supertonicRelative  s = minorScale $ s `pitchClassAt` Supertonic
+-- relative minor of the dominant
+mediantRelative     s = minorScale $ s `pitchClassAt` Mediant
+-- one less sharp/one more flat around the circle of fifths
+subdominantRelative s = majorScale $ s `pitchClassAt` Subdominant
+-- one more sharp/one fewer flat around the circle of fifths
+dominantRelative    s = majorScale $ s `pitchClassAt` Dominant
+-- different tonic, same key signature
+submediantRelative  s = minorScale $ s `pitchClassAt` Submediant
+relativeMinor         = submediantRelative
+
+-- | CLOSE KEYS FOR MINOR SCALES
+relativeMajor       s = majorScale $ s `pitchClassAt` Mediant
+
+-- from: https://en.wikipedia.org/wiki/Parallel_key
+parallelMajor, parallelMinor :: Scale -> Scale
+parallelMajor s = majorScale $ (root s)
+parallelMinor s = minorScale $ (root s)
