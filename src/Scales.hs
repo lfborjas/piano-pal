@@ -253,6 +253,9 @@ mode s
   | isMinor s = "minor"
   | otherwise = ""
 
+label :: Scale -> String
+label s = intercalate " " [show (root s), mode s]
+
 -- | Relationships between scales:
 -- https://en.wikipedia.org/wiki/Closely_related_key
 
