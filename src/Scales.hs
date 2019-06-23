@@ -1,7 +1,7 @@
 module Scales where
 
 import Euterpea
-import Data.List (intercalate)
+import Data.List (intercalate, nubBy, sortBy)
 
 -- these are actually just aliases for some main intervals:
 -- https://en.wikipedia.org/wiki/Interval_(music)#Main_intervals
@@ -24,8 +24,7 @@ data Interval = PerfectUnison   -- DiminishedSecond
               | MajorSixth      -- DiminishedSeventh
               | MinorSeventh    -- AugmentedSixth
               | MajorSeventh    -- DiminishedOctave
-              | PerfectOctave   -- AugmentedSeventh
-              | DiminishedNinth  
+              | PerfectOctave   -- AugmentedSeventh | DiminishedNinth
               | MinorNinth      -- AugmentedOctave
               | MajorNinth      -- DiminishedTenth
               | MinorTenth      -- AugmentedNinth
@@ -38,7 +37,8 @@ data Interval = PerfectUnison   -- DiminishedSecond
               | MinorFourteenth -- AugmentedThirteenth
               | MajorFourteenth -- DiminishedFifteenth
               | DoubleOctave    -- PerfectFifteenth | AugmentedFourteenth
-              | AugmentedFifteenth
+              -- | AugmentedFifteenth -- We're stopping at 24 semitones (a double octave) since
+              -- scales/chords with larger intervals seldom occur
               deriving (Show, Eq, Ord, Enum)
 
 data Degree = Tonic       -- I
@@ -168,6 +168,25 @@ pitches s =
     intervals = map fromEnum (steps s)
     start     = ((root s), 0)
 
+
+-- Assumes that the scale provides notes up to the octave (i.e. the repeat of the root)
+-- any repeated pitches beyond the octave are ignored as a simple cycle of the scale.
+-- Pitches may not be provided in order, but they'll be ordered by ascending frequency
+-- when determining the steps of the scale.
+-- e.g.
+-- fromPitches [(C,1), (D,1), (E,1), (F,1), (G,1), (A,1), (B,1), (C,2), (D,2)]
+-- C D E F G A B
+fromPitches :: [Pitch] -> Scale
+fromPitches []  = error "Can't derive scale from empty pitch list"
+fromPitches [x] = error "One note does not a scale make!"
+fromPitches ps = Scale {root=r, steps=intervals}
+  where (r,_)         = head ps
+        intervals     = deriveIntervals $ uniquePitches $ sortPitches ps
+        -- helper functions we could break out:
+        uniquePitches  (oct:dp) = oct:(nubBy  (\(pc1, _) (pc2, _) -> pc1 == pc2) dp)
+        sortPitches    up = sortBy (\a b -> absPitch a `compare` absPitch b) up
+        deriveIntervals s = [ toEnum ((absPitch b - absPitch a) `mod` 24) :: Interval
+                            | (a,b) <- zip s $ tail s ] -- make a list of pairs
 
 movePitches :: Int -> [Pitch] -> [Pitch]
 movePitches n ps = [(pc, o+n) | (pc, o) <- ps]
