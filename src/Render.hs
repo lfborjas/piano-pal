@@ -103,6 +103,26 @@ writeScore n s = do
   writeFile (n ++ ".ly") (renderScore s)
   callCommand $ concat ["~/bin/lilypond ", n, ".ly"]
 
+-- TODO: better design of how to print multiple scales in one file with headers and maybe even suggested fingering
+-- e.g.
+
+{-
+ \score {
+
+{
+\clef treble
+\key c \minor
+c'4 d'4 ef'4 f'4 g'4 af'4 bf'4
+c''4 d''4 ds''4 f''4 g''4 gs''4 as''4
+}
+
+\header{piece="C minor Scale"}
+}
+
+from: http://lilypond.org/doc/v2.18/Documentation/notation/creating-titles-headers-and-footers#titles-explained
+
+-}
+
 {-
 
 sorta working:
