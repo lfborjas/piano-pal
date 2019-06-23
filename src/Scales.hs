@@ -8,7 +8,38 @@ import Data.List (intercalate)
 data Step = Half
           | Whole
           | AugmentedSecond
-          deriving (Show, Eq, Ord, Enum)
+          deriving (Show, Eq, Ord)
+
+-- https://en.wikipedia.org/wiki/Interval_(music)#Main_intervals
+-- And: https://en.wikipedia.org/wiki/Interval_(music)#Main_intervals
+data Interval = PerfectUnison   -- DiminishedSecond
+              | MinorSecond     -- AugmentedUnison
+              | MajorSecond     -- DiminishedThird
+              | MinorThird      -- AugmentedSecond
+              | MajorThird      -- DiminishedFourth
+              | PerfectFourth   -- AugmentedThird
+              | DiminishedFifth -- AugmentedFourth
+              | PerfectFifth    -- DiminishedSixth
+              | MinorSixth      -- AugmentedFifth
+              | MajorSixth      -- DiminishedSeventh
+              | MinorSeventh    -- AugmentedSixth
+              | MajorSeventh    -- DiminishedOctave
+              | PerfectOctave   -- AugmentedSeventh
+              | DiminishedNinth  
+              | MinorNinth      -- AugmentedOctave
+              | MajorNinth      -- DiminishedTenth
+              | MinorTenth      -- AugmentedNinth
+              | MajorTenth      -- DiminishedEleventh
+              | PerfectEleventh -- AugmentedTenth
+              | DiminishedTwelfth -- AugmentedEleventh
+              | PerfectTwelfth  -- Tritave | DiminishedThirteenth
+              | MinorThirteenth -- AugmentedTwelfth
+              | MajorThirteenth -- DiminishedFourteenth
+              | MinorFourteenth -- AugmentedThirteenth
+              | MajorFourteenth -- DiminishedFifteenth
+              | DoubleOctave    -- PerfectFifteenth | AugmentedFourteenth
+              | AugmentedFifteenth
+              deriving (Show, Eq, Ord, Enum)
 
 data Degree = Tonic       -- I
             | Supertonic  -- II
@@ -19,12 +50,19 @@ data Degree = Tonic       -- I
             | LeadingTone -- VII (Subtonic in the natural minor scale)
             deriving (Show, Eq, Ord, Enum)
 
-data Scale = Scale { steps :: [Step]
+data Scale = Scale { steps :: [Interval]
                    , root  :: PitchClass
                    } deriving (Eq, Ord)
 
 instance Show Scale where
   show s = intercalate " " $ map show $ diatonicPitchClasses s
+
+
+-- convenience function to translate some very common intervals
+fromStep :: Step -> Interval
+fromStep Half            = MinorSecond
+fromStep Whole           = MajorSecond
+fromStep AugmentedSecond = MinorThird
 
 noteCount :: Scale -> Int
 noteCount s =  length $ steps s
@@ -127,7 +165,7 @@ pitches s =
   map pitch $ 
   scanl (+) (absPitch start) (cycle intervals)
   where
-    intervals = map (succ . fromEnum) (steps s)
+    intervals = map fromEnum (steps s)
     start     = ((root s), 0)
 
 
@@ -171,16 +209,16 @@ pianoScale scale =
     highestPitch = (C,8)
 
 -- | Query functions/default scales
-
-majorScaleSteps = [Whole,Whole,Half,Whole,Whole,Whole,Half]
-minorScaleSteps = [Whole,Half,Whole,Whole,Half,Whole,Whole]
+asIntervals = map fromStep
+majorScaleSteps = asIntervals [Whole,Whole,Half,Whole,Whole,Whole,Half]
+minorScaleSteps = asIntervals [Whole,Half,Whole,Whole,Half,Whole,Whole]
 
 majorScale, minorScale, harmonicMinorScale,
   melodicMinorAscending, melodicMinorDescending :: PitchClass -> Scale
 majorScale             = Scale majorScaleSteps
 minorScale             = Scale minorScaleSteps
-harmonicMinorScale     = Scale [Whole,Half,Whole,Whole,Half,AugmentedSecond,Half]
-melodicMinorAscending  = Scale [Whole,Half,Whole,Whole,Whole,Whole,Half]
+harmonicMinorScale     = Scale $ asIntervals [Whole,Half,Whole,Whole,Half,AugmentedSecond,Half]
+melodicMinorAscending  = Scale $ asIntervals [Whole,Half,Whole,Whole,Whole,Whole,Half]
 melodicMinorDescending = minorScale
 
 isMajor, isMinor :: Scale -> Bool
