@@ -1,14 +1,45 @@
 module Scales where
 
 import Euterpea
-import Data.List (intercalate)
+import Data.List (intercalate, nubBy, sortBy)
 
 -- these are actually just aliases for some main intervals:
 -- https://en.wikipedia.org/wiki/Interval_(music)#Main_intervals
 data Step = Half
           | Whole
           | AugmentedSecond
-          deriving (Show, Eq, Ord, Enum)
+          deriving (Show, Eq, Ord)
+
+-- https://en.wikipedia.org/wiki/Interval_(music)#Main_intervals
+-- And: https://en.wikipedia.org/wiki/Interval_(music)#Main_intervals
+data Interval = PerfectUnison   -- DiminishedSecond
+              | MinorSecond     -- AugmentedUnison
+              | MajorSecond     -- DiminishedThird
+              | MinorThird      -- AugmentedSecond
+              | MajorThird      -- DiminishedFourth
+              | PerfectFourth   -- AugmentedThird
+              | DiminishedFifth -- AugmentedFourth
+              | PerfectFifth    -- DiminishedSixth
+              | MinorSixth      -- AugmentedFifth
+              | MajorSixth      -- DiminishedSeventh
+              | MinorSeventh    -- AugmentedSixth
+              | MajorSeventh    -- DiminishedOctave
+              | PerfectOctave   -- AugmentedSeventh | DiminishedNinth
+              | MinorNinth      -- AugmentedOctave
+              | MajorNinth      -- DiminishedTenth
+              | MinorTenth      -- AugmentedNinth
+              | MajorTenth      -- DiminishedEleventh
+              | PerfectEleventh -- AugmentedTenth
+              | DiminishedTwelfth -- AugmentedEleventh
+              | PerfectTwelfth  -- Tritave | DiminishedThirteenth
+              | MinorThirteenth -- AugmentedTwelfth
+              | MajorThirteenth -- DiminishedFourteenth
+              | MinorFourteenth -- AugmentedThirteenth
+              | MajorFourteenth -- DiminishedFifteenth
+              | DoubleOctave    -- PerfectFifteenth | AugmentedFourteenth
+              -- | AugmentedFifteenth -- We're stopping at 24 semitones (a double octave) since
+              -- scales/chords with larger intervals seldom occur
+              deriving (Show, Eq, Ord, Enum)
 
 data Degree = Tonic       -- I
             | Supertonic  -- II
@@ -19,12 +50,19 @@ data Degree = Tonic       -- I
             | LeadingTone -- VII (Subtonic in the natural minor scale)
             deriving (Show, Eq, Ord, Enum)
 
-data Scale = Scale { steps :: [Step]
+data Scale = Scale { steps :: [Interval]
                    , root  :: PitchClass
                    } deriving (Eq, Ord)
 
 instance Show Scale where
   show s = intercalate " " $ map show $ diatonicPitchClasses s
+
+
+-- convenience function to translate some very common intervals
+fromStep :: Step -> Interval
+fromStep Half            = MinorSecond
+fromStep Whole           = MajorSecond
+fromStep AugmentedSecond = MinorThird
 
 noteCount :: Scale -> Int
 noteCount s =  length $ steps s
@@ -127,9 +165,28 @@ pitches s =
   map pitch $ 
   scanl (+) (absPitch start) (cycle intervals)
   where
-    intervals = map (succ . fromEnum) (steps s)
+    intervals = map fromEnum (steps s)
     start     = ((root s), 0)
 
+
+-- Assumes that the scale provides notes up to the octave (i.e. the repeat of the root)
+-- any repeated pitches beyond the octave are ignored as a simple cycle of the scale.
+-- Pitches may not be provided in order, but they'll be ordered by ascending frequency
+-- when determining the steps of the scale.
+-- e.g.
+-- fromPitches [(C,1), (D,1), (E,1), (F,1), (G,1), (A,1), (B,1), (C,2), (D,2)]
+-- C D E F G A B
+fromPitches :: [Pitch] -> Scale
+fromPitches []  = error "Can't derive scale from empty pitch list"
+fromPitches [x] = error "One note does not a scale make!"
+fromPitches ps = Scale {root=r, steps=intervals}
+  where (r,_)         = head ps
+        intervals     = deriveIntervals $ uniquePitches $ sortPitches ps
+        -- helper functions we could break out:
+        uniquePitches  (oct:dp) = oct:(nubBy  (\(pc1, _) (pc2, _) -> pc1 == pc2) dp)
+        sortPitches    up = sortBy (\a b -> absPitch a `compare` absPitch b) up
+        deriveIntervals s = [ toEnum ((absPitch b - absPitch a) `mod` 24) :: Interval
+                            | (a,b) <- zip s $ tail s ] -- make a list of pairs
 
 movePitches :: Int -> [Pitch] -> [Pitch]
 movePitches n ps = [(pc, o+n) | (pc, o) <- ps]
@@ -153,8 +210,17 @@ pitches'        = treblePitches -- by default, prefer the treble clef
 toMusic :: Dur -> Scale -> Music Pitch
 toMusic d scale = line notes
   where
-    notes = map (note d) $ take n $ pitches' scale
-    n     = noteCount scale
+    notes = map (note d) $ diatonicPitches
+    diatonicPitches = [(pc,4) | pc <- diatonicPitchClasses scale]
+
+-- produces the requested number of octaves in the requested duration
+toMusicOctaves :: Int -> Dur -> Scale -> Music Pitch
+toMusicOctaves n d scale = line notes
+  where
+    notes = map (note d) $ take (7*n+1) $ concat diatonicPitches
+    diatonicPitches = iterate (movePitches 1) startingPitches
+    startingPitches = [(pc,startingOct) | pc <- diatonicPitchClasses scale]
+    startingOct = 4 -- middle octave
 
 -- Given a lowest and highest pitches, check if a provided
 -- music value's pitch is within those bounds.
@@ -171,16 +237,16 @@ pianoScale scale =
     highestPitch = (C,8)
 
 -- | Query functions/default scales
-
-majorScaleSteps = [Whole,Whole,Half,Whole,Whole,Whole,Half]
-minorScaleSteps = [Whole,Half,Whole,Whole,Half,Whole,Whole]
+asIntervals = map fromStep
+majorScaleSteps = asIntervals [Whole,Whole,Half,Whole,Whole,Whole,Half]
+minorScaleSteps = asIntervals [Whole,Half,Whole,Whole,Half,Whole,Whole]
 
 majorScale, minorScale, harmonicMinorScale,
   melodicMinorAscending, melodicMinorDescending :: PitchClass -> Scale
 majorScale             = Scale majorScaleSteps
 minorScale             = Scale minorScaleSteps
-harmonicMinorScale     = Scale [Whole,Half,Whole,Whole,Half,AugmentedSecond,Half]
-melodicMinorAscending  = Scale [Whole,Half,Whole,Whole,Whole,Whole,Half]
+harmonicMinorScale     = Scale $ asIntervals [Whole,Half,Whole,Whole,Half,AugmentedSecond,Half]
+melodicMinorAscending  = Scale $ asIntervals [Whole,Half,Whole,Whole,Whole,Whole,Half]
 melodicMinorDescending = minorScale
 
 isMajor, isMinor :: Scale -> Bool
@@ -195,6 +261,9 @@ mode s
   | isMajor s = "major"
   | isMinor s = "minor"
   | otherwise = ""
+
+label :: Scale -> String
+label s = intercalate " " [show (root s), mode s]
 
 -- | Relationships between scales:
 -- https://en.wikipedia.org/wiki/Closely_related_key

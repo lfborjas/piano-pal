@@ -13,14 +13,21 @@ import Data.List (intercalate)
 import System.Process (callCommand)
 
 type ScoreFragment = String
+
+type LilypondCommand =  (String, [String])
+
 data Score = Score { clef :: String
                    , fragments :: [ScoreFragment]
-                   }
+                   , meta :: [LilypondCommand]
+                   } deriving (Show)
 
 -- For reference, start here: http://lilypond.org/text-input.html
 -- and: http://lilypond.org/doc/v2.18/Documentation/learning/simple-notation#all-together
 class LilypondRenderable a where
   toLilypond :: a -> ScoreFragment
+
+class Notate a where
+  toScore :: a -> Score
 
 instance LilypondRenderable Pitch where
   toLilypond (pc, o) = concat [toLilypond pc, toLilypond o]
@@ -52,10 +59,23 @@ instance LilypondRenderable (Music Pitch) where
   toLilypond (m1 :+: m2) = lconcat [toLilypond m1, toLilypond m2]
   toLilypond m@(_ :=: _) = showChord m
 
+instance Notate (Music Pitch) where
+  toScore m = Score{clef="treble", fragments=[f], meta=[]}
+    where
+      f = toLilypond $ removeZeros $ m  
+
+instance Notate Scale where
+  toScore s = Score{clef="treble", fragments=[m], meta=meta}
+    where
+      m  = toLilypond $ removeZeros $ Scales.toMusicOctaves 2 qn s
+      meta = [("key", [pitch, "\\"++(mode s)])]
+      pitch = map toLower $ show (root s)
+
 -- inspired by: https://hackage.haskell.org/package/base-4.9.0.0/docs/src/GHC.Show.html#showList__
 -- this method was giving bonkers error messages that I never really figured out
 -- (fixed by enabling FlexibleContexts, though that seems rather arcane to me)
 -- see bottom of file for more.
+-- also: http://lilypond.org/doc/v2.19/Documentation/notation/displaying-chords
 showChord :: Music Pitch -> ScoreFragment
 showChord (m :=: ms) =
   lconcat ["<", toLilypond (getPitch m), (toL ms)]
@@ -65,34 +85,43 @@ showChord (m :=: ms) =
     getPitch (Prim (Note _ p)) = p
     getDur   (Prim (Note d _)) = d
 
--- TODO: add a ToScore class that generates a score from scales and chords
--- the method provided there has a context of the scale, so before generating the score
--- it can get rid of enharmonics that make a note repeat in the scale
-
-
--- also: http://lilypond.org/doc/v2.19/Documentation/notation/displaying-chords
-
 lconcat = intercalate " "
-
-toScore :: Music Pitch -> Score
-toScore m = Score{clef="treble", fragments=[f]}
-  where
-    f = toLilypond $ removeZeros $ m
 
 -- TODO: there's many more bells and whistles, like scales and tempi:
 -- http://lilypond.org/doc/v2.18/Documentation/learning/simple-notation#all-together
 renderScore :: Score -> String
-renderScore s = nlconcat [languageRender, "{", clefRender, fragmentsRender, "}"]
+renderScore s = nlconcat [languageRender, "{", clefRender, metaRender, fragmentsRender, "}"]
   where
     languageRender  = "\\language \"english\""
     clefRender      = lconcat ["\\clef", (clef s)]
-    fragmentsRender = nlconcat (fragments s)
     nlconcat        = intercalate "\n"
+    metaRender      = nlconcat $ map (\(c, a) -> "\\" ++ c ++ " " ++ (intercalate " " a)) (meta s)
+    fragmentsRender = nlconcat (fragments s)
 
-writeScore :: Score -> String -> IO ()
-writeScore s n = do
+writeScore :: String -> Score -> IO ()
+writeScore n s = do
   writeFile (n ++ ".ly") (renderScore s)
   callCommand $ concat ["~/bin/lilypond ", n, ".ly"]
+
+-- TODO: better design of how to print multiple scales in one file with headers and maybe even suggested fingering
+-- e.g.
+
+{-
+ \score {
+
+{
+\clef treble
+\key c \minor
+c'4 d'4 ef'4 f'4 g'4 af'4 bf'4
+c''4 d''4 ds''4 f''4 g''4 gs''4 as''4
+}
+
+\header{piece="C minor Scale"}
+}
+
+from: http://lilypond.org/doc/v2.18/Documentation/notation/creating-titles-headers-and-footers#titles-explained
+
+-}
 
 {-
 
@@ -100,14 +129,13 @@ sorta working:
 
 -- SCALES:
 
-λ> cMaj = minorScale (A,4)
-λ> play $ Scales.toMusic en cMaj
-
-λ> s = toScore $ Scales.toMusic en cMaj
-λ> print $ renderScore s
-"{\n\\clef treble\na'8 b'8 c''8 d''8 e''8 f''8 g''8 a''8\n}"
-
-λ> writeScore s "a-minor"
+λ> renderScore $ toScore $ minorScale C
+"\\language \"english\"\n{\n\\clef treble\n\\key c \\minor\nc'4 d'4 ef'4 f'4 g'4 af'4 bf'4\nc''4 d''4 ds''4 f''4 g''4 gs''4 as''4\n}"
+λ> writeScore "cmin3" $ toScore $ minorScale C
+GNU LilyPond 2.18.2
+Processing `cmin3.ly'
+Parsing...
+cmin3.ly:1: warning: no \version statement found, please add
 
 \version "2.18.2"
 
@@ -117,8 +145,8 @@ Preprocessing graphical objects...
 Finding the ideal number of pages...
 Fitting music on 1 page...
 Drawing systems...
-Layout output to `a-minor.ps'...
-Converting to `./a-minor.pdf'...
+Layout output to `cmin3.ps'...
+Converting to `./cmin3.pdf'...
 Success: compilation successfully completed
 
 -- CHORDS:

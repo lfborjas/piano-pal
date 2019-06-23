@@ -8,35 +8,7 @@ import Data.List (intercalate, elemIndex)
 
 
 -- From: https://en.wikipedia.org/wiki/Chord_(music)#Examples
--- And: https://en.wikipedia.org/wiki/Interval_(music)#Main_intervals
-data Interval = PerfectUnison   -- DiminishedSecond
-              | MinorSecond     -- AugmentedUnison
-              | MajorSecond     -- DiminishedThird
-              | MinorThird      -- AugmentedSecond
-              | MajorThird      -- DiminishedFourth
-              | PerfectFourth   -- AugmentedThird
-              | DiminishedFifth -- AugmentedFourth
-              | PerfectFifth    -- DiminishedSixth
-              | MinorSixth      -- AugmentedFifth
-              | MajorSixth      -- DiminishedSeventh
-              | MinorSeventh    -- AugmentedSixth
-              | MajorSeventh    -- DiminishedOctave
-              | PerfectOctave   -- AugmentedSeventh
-              | DiminishedNinth  
-              | MinorNinth      -- AugmentedOctave
-              | MajorNinth      -- DiminishedTenth
-              | MinorTenth      -- AugmentedNinth
-              | MajorTenth      -- DiminishedEleventh
-              | PerfectEleventh -- AugmentedTenth
-              | DiminishedTwelfth -- AugmentedEleventh
-              | PerfectTwelfth  -- Tritave | DiminishedThirteenth
-              | MinorThirteenth -- AugmentedTwelfth
-              | MajorThirteenth -- DiminishedFourteenth
-              | MinorFourteenth -- AugmentedThirteenth
-              | MajorFourteenth -- DiminishedFifteenth
-              | DoubleOctave    -- PerfectFifteenth | AugmentedFourteenth
-              | AugmentedFifteenth
-              deriving (Show, Eq, Ord, Enum)
+
 
 
 -- TODO: a chord is more than an array of pitches:
