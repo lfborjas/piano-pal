@@ -13,8 +13,12 @@ import Data.List (intercalate)
 import System.Process (callCommand)
 
 type ScoreFragment = String
+
+type LilypondCommand =  (String, [String])
+
 data Score = Score { clef :: String
                    , fragments :: [ScoreFragment]
+                   , meta :: [LilypondCommand]
                    } deriving (Show)
 
 -- For reference, start here: http://lilypond.org/text-input.html
@@ -56,17 +60,16 @@ instance LilypondRenderable (Music Pitch) where
   toLilypond m@(_ :=: _) = showChord m
 
 instance Notate (Music Pitch) where
-  toScore m = Score{clef="treble", fragments=[f]}
+  toScore m = Score{clef="treble", fragments=[f], meta=[]}
     where
       f = toLilypond $ removeZeros $ m  
 
 instance Notate Scale where
-  toScore s = Score{clef="treble", fragments=[f,f']}
+  toScore s = Score{clef="treble", fragments=[m], meta=meta}
     where
-      m  = Scales.toMusic qn s
-      f  = t m
-      f' = t $ shiftPitches 12 m -- provide a second octave for better piano use
-      t  = toLilypond . removeZeros
+      m  = toLilypond $ removeZeros $ Scales.toMusicOctaves 2 qn s
+      meta = [("key", [pitch, "\\"++(mode s)])]
+      pitch = map toLower $ show (root s)
 
 -- inspired by: https://hackage.haskell.org/package/base-4.9.0.0/docs/src/GHC.Show.html#showList__
 -- this method was giving bonkers error messages that I never really figured out
@@ -87,15 +90,16 @@ lconcat = intercalate " "
 -- TODO: there's many more bells and whistles, like scales and tempi:
 -- http://lilypond.org/doc/v2.18/Documentation/learning/simple-notation#all-together
 renderScore :: Score -> String
-renderScore s = nlconcat [languageRender, "{", clefRender, fragmentsRender, "}"]
+renderScore s = nlconcat [languageRender, "{", clefRender, metaRender, fragmentsRender, "}"]
   where
     languageRender  = "\\language \"english\""
     clefRender      = lconcat ["\\clef", (clef s)]
-    fragmentsRender = nlconcat (fragments s)
     nlconcat        = intercalate "\n"
+    metaRender      = nlconcat $ map (\(c, a) -> "\\" ++ c ++ " " ++ (intercalate " " a)) (meta s)
+    fragmentsRender = nlconcat (fragments s)
 
-writeScore :: Score -> String -> IO ()
-writeScore s n = do
+writeScore :: String -> Score -> IO ()
+writeScore n s = do
   writeFile (n ++ ".ly") (renderScore s)
   callCommand $ concat ["~/bin/lilypond ", n, ".ly"]
 
@@ -105,14 +109,13 @@ sorta working:
 
 -- SCALES:
 
-λ> cMaj = minorScale (A,4)
-λ> play $ Scales.toMusic en cMaj
-
-λ> s = toScore $ Scales.toMusic en cMaj
-λ> print $ renderScore s
-"{\n\\clef treble\na'8 b'8 c''8 d''8 e''8 f''8 g''8 a''8\n}"
-
-λ> writeScore s "a-minor"
+λ> renderScore $ toScore $ minorScale C
+"\\language \"english\"\n{\n\\clef treble\n\\key c \\minor\nc'4 d'4 ef'4 f'4 g'4 af'4 bf'4\nc''4 d''4 ds''4 f''4 g''4 gs''4 as''4\n}"
+λ> writeScore "cmin3" $ toScore $ minorScale C
+GNU LilyPond 2.18.2
+Processing `cmin3.ly'
+Parsing...
+cmin3.ly:1: warning: no \version statement found, please add
 
 \version "2.18.2"
 
@@ -122,8 +125,8 @@ Preprocessing graphical objects...
 Finding the ideal number of pages...
 Fitting music on 1 page...
 Drawing systems...
-Layout output to `a-minor.ps'...
-Converting to `./a-minor.pdf'...
+Layout output to `cmin3.ps'...
+Converting to `./cmin3.pdf'...
 Success: compilation successfully completed
 
 -- CHORDS:

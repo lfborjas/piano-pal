@@ -213,6 +213,15 @@ toMusic d scale = line notes
     notes = map (note d) $ diatonicPitches
     diatonicPitches = [(pc,4) | pc <- diatonicPitchClasses scale]
 
+-- produces the requested number of octaves in the requested duration
+toMusicOctaves :: Int -> Dur -> Scale -> Music Pitch
+toMusicOctaves n d scale = line notes
+  where
+    notes = map (note d) $ take (7*n+1) $ concat diatonicPitches
+    diatonicPitches = iterate (movePitches 1) startingPitches
+    startingPitches = [(pc,startingOct) | pc <- diatonicPitchClasses scale]
+    startingOct = 4 -- middle octave
+
 -- Given a lowest and highest pitches, check if a provided
 -- music value's pitch is within those bounds.
 inRange :: Pitch -> Pitch -> Pitch -> Bool
