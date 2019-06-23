@@ -210,8 +210,8 @@ pitches'        = treblePitches -- by default, prefer the treble clef
 toMusic :: Dur -> Scale -> Music Pitch
 toMusic d scale = line notes
   where
-    notes = map (note d) $ take n $ pitches' scale
-    n     = noteCount scale
+    notes = map (note d) $ diatonicPitches
+    diatonicPitches = [(pc,4) | pc <- diatonicPitchClasses scale]
 
 -- Given a lowest and highest pitches, check if a provided
 -- music value's pitch is within those bounds.
